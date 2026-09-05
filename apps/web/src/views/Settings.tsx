@@ -78,7 +78,7 @@ export function Settings({ initial }: Props) {
     <div className="ledger-grid">
       <section className="entry span-6 rise" style={{ ["--d" as string]: "0ms" }} aria-label="Rate window">
         <div className="entry-head">
-          <span className="entry-no">09</span>
+          
           <h2>Rate window</h2>
           {saved === "window" && <span className="saved-tick">saved ✓</span>}
         </div>
@@ -122,7 +122,7 @@ export function Settings({ initial }: Props) {
 
       <section className="entry span-6 rise" style={{ ["--d" as string]: "70ms" }} aria-label="Currency">
         <div className="entry-head">
-          <span className="entry-no">10</span>
+          
           <h2>Currency</h2>
           {saved === "currency" && <span className="saved-tick">saved ✓</span>}
         </div>
@@ -146,7 +146,7 @@ export function Settings({ initial }: Props) {
 
       <section className="entry span-6 rise" style={{ ["--d" as string]: "140ms" }} aria-label="Excluded accounts">
         <div className="entry-head">
-          <span className="entry-no">11</span>
+          
           <h2>Excluded accounts</h2>
           {saved === "accounts" && <span className="saved-tick">saved ✓</span>}
         </div>
@@ -188,7 +188,7 @@ export function Settings({ initial }: Props) {
 
       <section className="entry span-6 rise" style={{ ["--d" as string]: "210ms" }} aria-label="Excluded categories">
         <div className="entry-head">
-          <span className="entry-no">12</span>
+          
           <h2>Excluded categories</h2>
           {saved === "categories" && <span className="saved-tick">saved ✓</span>}
         </div>
@@ -230,7 +230,7 @@ export function Settings({ initial }: Props) {
 
       <section className="entry span-12 rise accent-top" style={{ ["--d" as string]: "280ms" }} aria-label="Cooldown rules">
         <div className="entry-head">
-          <span className="entry-no">13</span>
+          
           <h2>Cooling delays</h2>
           {saved === "cooldown" && <span className="saved-tick">saved ✓</span>}
           <span className="sub">price → mandatory wait</span>

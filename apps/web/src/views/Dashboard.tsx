@@ -108,7 +108,7 @@ export function Dashboard({ initial }: Props) {
       <div className="ledger-grid">
         <section className="entry span-7 rise" style={{ ["--d" as string]: "70ms" }} data-testid="spot-panel">
           <div className="entry-head">
-            <span className="entry-no">01</span>
+            
             <h2>Position — spot vs trailing avg</h2>
             <span className="sub">{labels.length > 0 ? `${labels[0]} → ${labels[labels.length - 1]}` : ""}</span>
           </div>
@@ -124,7 +124,7 @@ export function Dashboard({ initial }: Props) {
 
         <section className="entry span-5 rise accent-top" style={{ ["--d" as string]: "140ms" }} data-testid="rate-panel">
           <div className="entry-head">
-            <span className="entry-no">02</span>
+            
             <h2>Save-rate trend</h2>
             <span className="sub">{snapshots.length} readings</span>
           </div>
@@ -141,7 +141,7 @@ export function Dashboard({ initial }: Props) {
 
         <section className="entry span-7 rise" style={{ ["--d" as string]: "210ms" }} data-testid="goals-panel">
           <div className="entry-head">
-            <span className="entry-no">03</span>
+            
             <h2>Goals &amp; arrival dates</h2>
             <span className="sub">{goals.length} open</span>
           </div>
@@ -150,7 +150,7 @@ export function Dashboard({ initial }: Props) {
 
         <section className="entry span-5 rise" style={{ ["--d" as string]: "280ms" }} data-testid="cooling-panel">
           <div className="entry-head">
-            <span className="entry-no">04</span>
+            
             <h2>Cooling queue</h2>
             <span className="sub">wishes waiting out delay</span>
           </div>
@@ -164,7 +164,7 @@ export function Dashboard({ initial }: Props) {
 
         <section className="entry span-12 rise" style={{ ["--d" as string]: "350ms" }} data-testid="total-delay-panel">
           <div className="entry-head">
-            <span className="entry-no">05</span>
+            
             <h2>Total delay</h2>
             <span className="sub">what the whole queue costs each goal</span>
           </div>

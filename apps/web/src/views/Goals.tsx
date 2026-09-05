@@ -67,7 +67,7 @@ export function Goals({ initial, currency = "USD" }: Props) {
     <div className="ledger-grid">
       <section className="entry span-8 rise" style={{ ["--d" as string]: "0ms" }} aria-label="Goals ledger">
         <div className="entry-head">
-          <span className="entry-no">05</span>
+          
           <h2>Goals</h2>
           <span className="sub">{goals.length} on the books</span>
         </div>
