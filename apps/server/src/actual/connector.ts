@@ -168,10 +168,10 @@ export class ActualConnector {
     return out;
   }
 
-  /** Budget currency: budget prefs, else ACTUAL_CURRENCY, else USD. */
+  /** Budget currency: budget prefs, else ACTUAL_CURRENCY, else USD. Blank counts as missing (#23). */
   async getCurrency(): Promise<string> {
     const prefs = await this.deps.getPreferences();
-    return prefs.defaultCurrencyCode ?? this.config.currency ?? 'USD';
+    return prefs.defaultCurrencyCode?.trim() || this.config.currency?.trim() || 'USD';
   }
 
   /**
