@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { rowToWish } from '../db.js';
+import { cooldownDaysFor, cooldownUntilIso, getSettings } from '../settings.js';
 import type { Cadence, Wish, WishStatus } from '../types.js';
 import { isIsoDate, isNonNegativeNumber, sendError } from './validate.js';
 
@@ -9,6 +10,18 @@ const CADENCES: readonly string[] = ['one-off', 'daily', 'weekly', 'monthly'];
 const STATUSES: readonly string[] = ['inbox', 'cooling', 'ready', 'bought', 'rejected'];
 
 type WishRow = Parameters<typeof rowToWish>[0];
+/**
+ * Read-time status derivation (#20): a cooling wish whose timer expired (or
+ * was never set) reads back ready. Stored rows are never rewritten — the
+ * response status is what queue filters must use.
+ */
+export function deriveWishStatus(wish: Wish, nowMs: number = Date.now()): Wish {
+  if (wish.status !== 'cooling') return wish;
+  if (wish.cooldownUntil == null) return { ...wish, status: 'ready' };
+  const expires = Date.parse(wish.cooldownUntil);
+  return Number.isNaN(expires) || expires <= nowMs ? { ...wish, status: 'ready' } : wish;
+}
+
 
 function parseWishBody(body: Record<string, unknown>, partial: boolean): { wish?: object; error?: string } {
   const out: Record<string, unknown> = {};
@@ -30,7 +43,8 @@ function parseWishBody(body: Record<string, unknown>, partial: boolean): { wish?
     out.cadence = cadence as Cadence;
   }
   if ('status' in body || !partial) {
-    const status = ('status' in body ? body.status : 'inbox') as unknown;
+    // New wishes enter cooling by default (#20); inbox stays user-settable.
+    const status = ('status' in body ? body.status : 'cooling') as unknown;
     if (typeof status !== 'string' || !STATUSES.includes(status)) {
       return { error: `status must be one of ${STATUSES.join('|')}` };
     }
@@ -74,7 +88,7 @@ export function wishesRouter(db: Database.Database): Router {
   const remove = db.prepare('DELETE FROM wishes WHERE id = ?');
 
   router.get('/', (_req, res) => {
-    res.json((selectAll.all() as WishRow[]).map(rowToWish));
+    res.json((selectAll.all() as WishRow[]).map((row) => deriveWishStatus(rowToWish(row))));
   });
 
   router.post('/', (req, res) => {
@@ -102,11 +116,15 @@ export function wishesRouter(db: Database.Database): Router {
     for (const key of ['cooldownUntil', 'linkedGoalId', 'url', 'notes'] as const) {
       if (fields[key] != null) wish[key] = fields[key] as string;
     }
+    if (wish.cooldownUntil == null) {
+      const rules = getSettings(db).cooldownRules;
+      wish.cooldownUntil = cooldownUntilIso(wish.addedAt, cooldownDaysFor(wish.price, rules));
+    }
     insert.run(
       wish.id, wish.name, wish.price, wish.cadence, wish.status, wish.addedAt,
       wish.cooldownUntil ?? null, wish.linkedGoalId ?? null, wish.url ?? null, wish.notes ?? null,
     );
-    res.status(201).json(wish);
+    res.status(201).json(deriveWishStatus(wish));
   });
 
   router.get('/:id', (req, res) => {
@@ -115,7 +133,7 @@ export function wishesRouter(db: Database.Database): Router {
       sendError(res, 404, 'wish not found');
       return;
     }
-    res.json(rowToWish(row));
+    res.json(deriveWishStatus(rowToWish(row)));
   });
 
   router.put('/:id', (req, res) => {
@@ -146,7 +164,7 @@ export function wishesRouter(db: Database.Database): Router {
       merged.cooldownUntil ?? null, merged.linkedGoalId ?? null, merged.url ?? null,
       merged.notes ?? null, merged.id,
     );
-    res.json(merged);
+    res.json(deriveWishStatus(merged));
   });
 
   router.delete('/:id', (req, res) => {

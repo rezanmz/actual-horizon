@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyExclusions,
   avg30,
   daysToGoal,
+  flowStats,
   impactOfWish,
   projectWaterfall,
   rateFromTransactions,
@@ -48,6 +50,31 @@ describe('savings rate', () => {
     expect(rateFromTransactions(txs, 30, false)).toBeCloseTo(133.33, 1);
   });
 });
+describe('window breakdown', () => {
+  it('splits a 180d window into inflow/outflow/count', () => {
+    // Live-diagnosis shape: hot-month flows diluted across 180d.
+    const txs = [{ amount: 21_493.2 }, { amount: -10_000 }, { amount: 5000, isTransfer: true }];
+    const stats = flowStats(txs, 180);
+    expect(stats.ratePerDay).toBeCloseTo(11_493.2 / 180);
+    expect(stats.inflowPerDay).toBeCloseTo(21_493.2 / 180);
+    expect(stats.outflowPerDay).toBeCloseTo(10_000 / 180);
+    expect(stats.txCount).toBe(2);
+  });
+
+  it('filters excluded accounts and categories before math', () => {
+    const txs = [
+      { amount: 1000, accountId: 'a1', categoryId: 'c1' },
+      { amount: 9000, accountId: 'a3', categoryId: 'c1' },
+      { amount: 8000, accountId: 'a1', categoryId: 'c9' },
+    ];
+    expect(rateFromTransactions(applyExclusions(txs, { excludedAccounts: ['a3'] }), 180)).toBe(50);
+    expect(rateFromTransactions(applyExclusions(txs, { excludedCategories: ['c9'] }), 180)).toBeCloseTo(
+      10_000 / 180,
+    );
+    expect(applyExclusions(txs)).toHaveLength(3);
+  });
+});
+
 
 describe('waterfall', () => {
   it('cascades goals in priority order against one shared balance', () => {

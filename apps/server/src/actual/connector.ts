@@ -59,8 +59,13 @@ export function endOfDayUTC(date: string): Date {
   return new Date(`${validateIsoDate(date, 'date')}T23:59:59.999Z`);
 }
 
-export function isOnBudgetAccount(account: ActualAccount): boolean {
-  return account.offbudget !== true && account.closed !== true;
+/**
+ * Net-worth universe: every non-closed account, on- AND off-budget.
+ * Closed accounts are always out; the on-budget-only view is just the
+ * default exclusion scenario (exclude the off-budget ids explicitly).
+ */
+export function isIncludedAccount(account: ActualAccount): boolean {
+  return account.closed !== true;
 }
 
 export class ActualConnector {
@@ -110,11 +115,12 @@ export class ActualConnector {
 
   /**
    * Daily closing spot balances (major units), oldest-first, ending today.
-   * Sums on-budget open accounts; one balance read per account per day.
+   * Sums the included universe (all non-closed accounts minus exclusions);
+   * one balance read per account per day.
    */
-  async getDailyBalances(days: number): Promise<SnapshotPoint[]> {
+  async getDailyBalances(days: number, filter: { excludedAccounts?: readonly string[] } = {}): Promise<SnapshotPoint[]> {
     validateDays(days);
-    const accounts = await this.onBudgetAccounts();
+    const accounts = await this.includedAccounts(filter.excludedAccounts);
     const dates = lastNDatesUTC(days);
     const points: SnapshotPoint[] = [];
     for (const date of dates) {
@@ -130,14 +136,19 @@ export class ActualConnector {
   }
 
   /**
-   * Transactions since `sinceIso` (inclusive, major units, date-sorted).
-   * Transfer legs are flagged via `transfer_id`; split children are skipped
-   * (their parent already carries the full amount).
+   * Transactions since `sinceIso` (inclusive, major units, date-sorted) from
+   * the included universe. Transfer legs are flagged via `transfer_id`;
+   * split children are skipped (their parent already carries the full
+   * amount). Each record carries accountId + categoryId so callers filter
+   * exclusions before doing math.
    */
-  async getTransactions(sinceIso: string): Promise<FlowTransaction[]> {
+  async getTransactions(
+    sinceIso: string,
+    filter: { excludedAccounts?: readonly string[] } = {},
+  ): Promise<FlowTransaction[]> {
     const since = validateIsoDate(sinceIso, 'sinceIso');
     const end = toISODateUTC(new Date());
-    const accounts = await this.onBudgetAccounts();
+    const accounts = await this.includedAccounts(filter.excludedAccounts);
     const out: FlowTransaction[] = [];
     for (const account of accounts) {
       const rows = await this.deps.getTransactions(account.id, since, end);
@@ -148,6 +159,8 @@ export class ActualConnector {
           date: row.date,
           amount: this.toMajor(row.amount),
           isTransfer: row.transfer_id !== undefined && row.transfer_id !== null,
+          accountId: account.id,
+          categoryId: row.category ?? null,
         });
       }
     }
@@ -161,12 +174,30 @@ export class ActualConnector {
     return prefs.defaultCurrencyCode ?? this.config.currency ?? 'USD';
   }
 
+  /**
+   * All non-closed accounts (on- and off-budget) with names for the
+   * exclusion UI. Excluded accounts stay listed so they can be un-excluded.
+   */
+  async getAccounts(): Promise<{ id: string; name: string; offBudget: boolean }[]> {
+    const accounts = await this.deps.getAccounts();
+    return accounts
+      .filter(isIncludedAccount)
+      .map((a) => ({ id: a.id, name: a.name ?? a.id, offBudget: a.offbudget === true }));
+  }
+
+  /** All categories with names for the exclusion UI. */
+  async getCategories(): Promise<{ id: string; name: string }[]> {
+    const categories = await this.deps.getCategories();
+    return categories.map((c) => ({ id: c.id, name: c.name ?? c.id }));
+  }
+
   async shutdown(): Promise<void> {
     await this.deps.shutdown();
   }
 
-  private async onBudgetAccounts(): Promise<ActualAccount[]> {
+  private async includedAccounts(excluded: readonly string[] = []): Promise<ActualAccount[]> {
+    const denied = new Set(excluded);
     const accounts = await this.deps.getAccounts();
-    return accounts.filter(isOnBudgetAccount);
+    return accounts.filter((a) => isIncludedAccount(a) && !denied.has(a.id));
   }
 }

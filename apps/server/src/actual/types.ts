@@ -20,6 +20,13 @@ export interface ActualTransaction {
   amount: number;
   transfer_id?: string | null | undefined;
   is_child?: boolean | undefined;
+  /** Category id (`category` on @actual-app/api 26.9.0 rows), null when uncategorized. */
+  category?: string | null | undefined;
+}
+
+export interface ActualCategory {
+  id: string;
+  name?: string | undefined;
 }
 
 /** Backend snapshot point: daily closing spot balance in major currency units. */
@@ -35,6 +42,10 @@ export interface FlowTransaction {
   date: string;
   amount: number;
   isTransfer: boolean;
+  /** Owning Actual account id (for account exclusions). */
+  accountId: string;
+  /** Actual category id, null when uncategorized (for category exclusions). */
+  categoryId: string | null;
 }
 
 /** Version probe result, mirroring @actual-app/api getServerVersion. */
@@ -71,6 +82,7 @@ export interface ActualDeps {
   downloadBudget(syncId: string, opts: { password: string | undefined }): Promise<void>;
   sync(): Promise<void>;
   getAccounts(): Promise<ActualAccount[]>;
+  getCategories(): Promise<ActualCategory[]>;
   getAccountBalance(id: string, cutoff: Date): Promise<number>;
   getTransactions(accountId: string, startDate: string, endDate: string): Promise<ActualTransaction[]>;
   getServerVersion(): Promise<ServerVersionProbe>;

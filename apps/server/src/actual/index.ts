@@ -2,6 +2,7 @@ export { EXPECTED_ACTUAL_VERSION, loadActualConfig, redactConfig } from './confi
 export type { ActualConfig, ActualEnv } from './config.js';
 export type {
   ActualAccount,
+  ActualCategory,
   ActualTransaction,
   SnapshotPoint,
   FlowTransaction,
@@ -12,7 +13,6 @@ export type {
   InitArgs,
   ActualDeps,
 } from './types.js';
-export { defaultActualDeps } from './api.js';
 export {
   ActualConnector,
   validateDays,
@@ -20,6 +20,6 @@ export {
   toISODateUTC,
   lastNDatesUTC,
   endOfDayUTC,
-  isOnBudgetAccount,
+  isIncludedAccount,
 } from './connector.js';
 export { connectAdapterFromEnv } from './boot.js';

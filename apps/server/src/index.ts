@@ -10,6 +10,8 @@ import { goalsRouter } from './routes/goals.js';
 import { healthRouter } from './routes/health.js';
 import { impactRouter } from './routes/impact.js';
 import { appendDailySnapshot, backfillSnapshots } from './snapshots.js';
+import { metaRouter } from './routes/meta.js';
+import { settingsRouter } from './routes/settings.js';
 import { snapshotsRouter } from './routes/snapshots.js';
 import { statsRouter } from './routes/stats.js';
 import { wishesRouter } from './routes/wishes.js';
@@ -30,11 +32,13 @@ export function createApp(options: AppOptions = {}): express.Express {
   app.use(express.json({ limit: '256kb' }));
 
   app.use('/api/health', healthRouter(options.adapter));
-  app.use('/api/stats', statsRouter(db));
+  app.use('/api/stats', statsRouter(db, options.adapter));
   app.use('/api/snapshots', snapshotsRouter(db));
   app.use('/api/goals', goalsRouter(db));
   app.use('/api/wishes', wishesRouter(db));
-  app.use('/api/impact', impactRouter(db));
+  app.use('/api/impact', impactRouter(db, options.adapter));
+  app.use('/api/settings', settingsRouter(db));
+  app.use('/api/meta', metaRouter(options.adapter));
 
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'unknown api route' });
