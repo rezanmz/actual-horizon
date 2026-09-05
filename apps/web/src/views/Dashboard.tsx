@@ -19,12 +19,6 @@ interface Props {
   initial?: DashboardData;
 }
 
-const panel: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 8,
-  padding: 16,
-};
-
 export function Dashboard({ initial }: Props) {
   const [data, setData] = useState<DashboardData | null>(initial ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -62,59 +56,120 @@ export function Dashboard({ initial }: Props) {
     };
   }, [initial]);
 
-  if (error) return <p role="alert">Dashboard failed to load: {error}</p>;
-  if (!data) return <p>Loading…</p>;
+  if (error) return <p role="alert" className="alert">Dashboard failed to load: {error}</p>;
+  if (!data) return <p className="loading-line">Opening the ledger…</p>;
 
   const { stats, snapshots, goals, wishes, impacts, health } = data;
   const labels = snapshots.map((s) => s.date);
+  const ratePositive = stats.ratePerDay > 0;
+  const windowNote =
+    stats.windowDays !== undefined
+      ? `${stats.windowDays}d window`
+      : "30d window";
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 16, alignItems: "baseline", marginBottom: 16 }}>
-        <span>
-          Spot <strong>{formatMoney(stats.spot, stats.currency)}</strong>
-        </span>
-        <span>
-          30d avg <strong>{formatMoney(stats.avg30, stats.currency)}</strong>
-        </span>
-        <span>
-          Rate <strong>{formatMoney(stats.ratePerDay, stats.currency)}/day</strong>
-        </span>
-        {health && (
-          <span style={{ marginLeft: "auto", fontSize: 12 }}>
-            Actual {health.actual.version} · {health.actual.reachable ? "reachable" : "unreachable"}
-          </span>
-        )}
-      </div>
-      <div
-        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}
-      >
-        <section style={panel} data-testid="spot-panel">
-          <h2>Net worth: spot vs 30d avg</h2>
+      <section className="figures rise" style={{ ["--d" as string]: "0ms" }} aria-label="Position summary">
+        <div className="figure">
+          <div className="k">Net worth · spot</div>
+          <div className="v">{formatMoney(stats.spot, stats.currency)}</div>
+          <div className="note">as of today</div>
+        </div>
+        <div className="figure">
+          <div className="k">Trailing average</div>
+          <div className="v">{formatMoney(stats.avg30, stats.currency)}</div>
+          <div className="note">30-day mean</div>
+        </div>
+        <div className="figure">
+          <div className="k">Save rate · {windowNote}</div>
+          <div className={`v${ratePositive ? " positive" : " negative"}`}>
+            {formatMoney(stats.ratePerDay, stats.currency)}
+            <small>/day</small>
+          </div>
+          <div className="note">
+            {stats.inflowPerDay !== undefined && stats.outflowPerDay !== undefined ? (
+              <>
+                <span className="mono">+{formatMoney(stats.inflowPerDay, stats.currency)}</span>
+                {" in · "}
+                <span className="mono">−{formatMoney(stats.outflowPerDay, stats.currency)}</span>
+                {" out"}
+                {stats.txCount !== undefined ? ` · ${stats.txCount} txns` : ""}
+              </>
+            ) : ratePositive ? (
+              "growing — wishes are affordable on schedule"
+            ) : (
+              "drifting — arrival dates suspended"
+            )}
+          </div>
+        </div>
+      </section>
+
+      <div className="ledger-grid">
+        <section className="entry span-7 rise" style={{ ["--d" as string]: "70ms" }} data-testid="spot-panel">
+          <div className="entry-head">
+            <span className="entry-no">01</span>
+            <h2>Position — spot vs trailing avg</h2>
+            <span className="sub">{labels.length > 0 ? `${labels[0]} → ${labels[labels.length - 1]}` : ""}</span>
+          </div>
           <LineChart
             labels={labels}
+            formatTick={(v) => formatMoney(v, stats.currency)}
             series={[
-              { label: "spot", color: "#1f6feb", values: snapshots.map((s) => s.spot) },
-              { label: "avg", color: "#d29922", values: snapshots.map((s) => s.avg) },
+              { label: "spot", color: "#1c1611", values: snapshots.map((s) => s.spot) },
+              { label: "avg", color: "#b23a1d", values: snapshots.map((s) => s.avg) },
             ]}
           />
         </section>
-        <section style={panel} data-testid="rate-panel">
-          <h2>Save rate trend</h2>
+
+        <section className="entry span-5 rise accent-top" style={{ ["--d" as string]: "140ms" }} data-testid="rate-panel">
+          <div className="entry-head">
+            <span className="entry-no">02</span>
+            <h2>Save-rate trend</h2>
+            <span className="sub">{snapshots.length} readings</span>
+          </div>
           <LineChart
             labels={labels}
-            series={[{ label: "rate/day", color: "#2f7d4f", values: snapshots.map((s) => s.rate) }]}
+            formatTick={(v) => `${formatMoney(v, stats.currency)}/d`}
+            series={[{ label: "rate/day", color: "#2e6b4f", values: snapshots.map((s) => s.rate) }]}
           />
+          <p className="row-meta" style={{ marginTop: 10 }}>
+            Averaged over the {windowNote}: every wish below is priced against this rate, so a
+            short-window spike can’t quietly promise what the ledger can’t pay.
+          </p>
         </section>
-        <section style={panel} data-testid="goals-panel">
-          <h2>Goals</h2>
+
+        <section className="entry span-7 rise" style={{ ["--d" as string]: "210ms" }} data-testid="goals-panel">
+          <div className="entry-head">
+            <span className="entry-no">03</span>
+            <h2>Goals &amp; arrival dates</h2>
+            <span className="sub">{goals.length} open</span>
+          </div>
           <GoalsPanel goals={goals} avg={stats.avg30} rate={stats.ratePerDay} currency={stats.currency} />
         </section>
-        <section style={panel} data-testid="cooling-panel">
-          <h2>Cooling queue</h2>
-          <CoolingQueue wishes={wishes} impacts={impacts} currency={stats.currency} />
+
+        <section className="entry span-5 rise" style={{ ["--d" as string]: "280ms" }} data-testid="cooling-panel">
+          <div className="entry-head">
+            <span className="entry-no">04</span>
+            <h2>Cooling queue</h2>
+            <span className="sub">wishes waiting out delay</span>
+          </div>
+          <CoolingQueue
+            wishes={wishes}
+            impacts={impacts}
+            currency={stats.currency}
+            ratePerDay={stats.ratePerDay}
+          />
         </section>
       </div>
+
+      {health && (
+        <p className="row-meta" style={{ marginTop: 18 }}>
+          <span className={`health-dot${health.actual.reachable ? "" : " down"}`} aria-hidden="true" />{" "}
+          <span className="mono">
+            Actual {health.actual.version} · {health.actual.reachable ? "reachable" : "unreachable"}
+          </span>
+        </p>
+      )}
     </div>
   );
 }

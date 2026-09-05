@@ -1,4 +1,4 @@
-import type { Goal, Impact, Snapshot, Stats, Wish } from "./types";
+import type { Goal, Impact, MetaEntry, Settings, Snapshot, Stats, Wish } from "./types";
 
 /** Pure helpers mirroring the frozen contract math (client-side display only). */
 
@@ -59,6 +59,10 @@ export const fixtureStats: Stats = {
   avg30: 11800,
   ratePerDay: 42,
   currency: "USD",
+  inflowPerDay: 210,
+  outflowPerDay: 168,
+  windowDays: 180,
+  txCount: 412,
 };
 
 export const fixtureSnapshots: Snapshot[] = Array.from({ length: 30 }, (_, i) => {
@@ -106,3 +110,28 @@ export const fixtureImpacts: Record<string, Impact> = {
     neverGoals: [],
   },
 };
+
+/** Frozen contract #18: default settings shape (GET /api/settings). */
+export const fixtureSettings: Settings = {
+  lookbackDays: 180,
+  excludedAccounts: [],
+  excludedCategories: [],
+  cooldownRules: [
+    { maxPrice: 50, days: 3 },
+    { maxPrice: 500, days: 7 },
+    { maxPrice: null, days: 30 },
+  ],
+  currency: "USD",
+};
+
+export const fixtureAccounts: MetaEntry[] = [
+  { id: "ac1", name: "Everyday checking" },
+  { id: "ac2", name: "Rainy-day savings" },
+  { id: "ac3", name: "Brokerage" },
+];
+
+export const fixtureCategories: MetaEntry[] = [
+  { id: "ct1", name: "Groceries" },
+  { id: "ct2", name: "Transfers" },
+  { id: "ct3", name: "Dining out" },
+];

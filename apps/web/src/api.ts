@@ -1,4 +1,13 @@
-import type { Goal, Health, Impact, Snapshot, Stats, Wish } from "./types";
+import type {
+  Goal,
+  Health,
+  Impact,
+  MetaEntry,
+  Settings,
+  Snapshot,
+  Stats,
+  Wish,
+} from "./types";
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -39,3 +48,12 @@ export const updateWish = (id: string, w: Partial<Omit<Wish, "id">>) =>
 export const deleteWish = async (id: string): Promise<void> => {
   await req<unknown>(`/api/wishes/${encodeURIComponent(id)}`, { method: "DELETE" });
 };
+
+/** Frozen contract #18: ledger settings + metadata. */
+export const getSettings = () => req<Settings>("/api/settings");
+export const updateSettings = (patch: Partial<Settings>) =>
+  req<Settings>("/api/settings", { method: "PUT", body: JSON.stringify(patch) });
+
+/** [] when Actual is unreachable — callers MUST render a graceful empty state. */
+export const getMetaAccounts = () => req<MetaEntry[]>("/api/meta/accounts");
+export const getMetaCategories = () => req<MetaEntry[]>("/api/meta/categories");
