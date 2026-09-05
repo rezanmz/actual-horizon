@@ -202,3 +202,40 @@ describe('wishes cooling (#20 backend)', () => {
     expect(diffDays).toBe(60);
   });
 });
+
+describe('partial PATCH updates (#24)', () => {
+  it('PATCH merges a wish cadence change', async () => {
+    const base = await serve(memDb());
+    const created = await json(`${base}/api/wishes`, {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Coffee', price: 5, cadence: 'one-off' }),
+    });
+    const id = (created.body as Record<string, string>).id;
+    const patched = await json(`${base}/api/wishes/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ cadence: 'daily' }),
+    });
+    expect(patched.status).toBe(200);
+    expect(patched.body).toMatchObject({ id, name: 'Coffee', cadence: 'daily' });
+    const missing = await json(`${base}/api/wishes/does-not-exist`, {
+      method: 'PATCH',
+      body: JSON.stringify({ cadence: 'daily' }),
+    });
+    expect(missing.status).toBe(404);
+  });
+
+  it('PATCH merges a goal target change', async () => {
+    const base = await serve(memDb());
+    const created = await json(`${base}/api/goals`, {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Fund', target: 1000, priority: 1 }),
+    });
+    const id = (created.body as Record<string, string>).id;
+    const patched = await json(`${base}/api/goals/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ target: 2000 }),
+    });
+    expect(patched.status).toBe(200);
+    expect(patched.body).toMatchObject({ id, name: 'Fund', target: 2000 });
+  });
+});

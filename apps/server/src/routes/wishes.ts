@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { rowToWish } from '../db.js';
 import { cooldownDaysFor, cooldownUntilIso, getSettings } from '../settings.js';
 import type { Cadence, Wish, WishStatus } from '../types.js';
@@ -135,8 +136,7 @@ export function wishesRouter(db: Database.Database): Router {
     }
     res.json(deriveWishStatus(rowToWish(row)));
   });
-
-  router.put('/:id', (req, res) => {
+  const updateWishById = (req: Request<{ id: string }>, res: Response): void => {
     const existing = selectOne.get(req.params.id) as WishRow | undefined;
     if (existing == null) {
       sendError(res, 404, 'wish not found');
@@ -165,7 +165,10 @@ export function wishesRouter(db: Database.Database): Router {
       merged.notes ?? null, merged.id,
     );
     res.json(deriveWishStatus(merged));
-  });
+  };
+  router.put('/:id', updateWishById);
+  // The web client sends partial updates as PATCH (#24); semantics match PUT.
+  router.patch('/:id', updateWishById);
 
   router.delete('/:id', (req, res) => {
     const result = remove.run(req.params.id);
