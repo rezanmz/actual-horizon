@@ -4,7 +4,7 @@ import { loadActualConfig, redactConfig } from './config.js';
 import {
   ActualConnector,
   endOfDayUTC,
-  isOnBudgetAccount,
+  isIncludedAccount,
   lastNDatesUTC,
   toISODateUTC,
   validateDays,
@@ -19,7 +19,7 @@ const ENV = {
 };
 
 function fakeDeps(overrides: Partial<ActualDeps> = {}): ActualDeps {
-  return {
+  const base: ActualDeps = {
     init: async () => ({ integerToAmount: (minor: number) => minor / 100 }),
     downloadBudget: async () => {},
     sync: async () => {},
@@ -31,11 +31,15 @@ function fakeDeps(overrides: Partial<ActualDeps> = {}): ActualDeps {
     ],
     getAccountBalance: async (id: string) => (id === 'a1' ? 100_00 : 50_00),
     getTransactions: async () => [],
+    getCategories: async () => [
+      { id: 'c1', name: 'Groceries' },
+      { id: 'c2', name: 'Rent' },
+    ],
     getServerVersion: async () => ({ version: '26.9.0' }),
     getPreferences: async () => ({}),
     shutdown: async () => {},
-    ...overrides,
   };
+  return Object.assign(base, overrides);
 }
 
 describe('loadActualConfig', () => {
@@ -83,10 +87,10 @@ describe('date helpers', () => {
     expect(endOfDayUTC('2026-09-05').toISOString()).toBe('2026-09-05T23:59:59.999Z');
   });
 
-  it('keeps only open on-budget accounts', () => {
-    expect(isOnBudgetAccount({ id: 'x' })).toBe(true);
-    expect(isOnBudgetAccount({ id: 'x', offbudget: true })).toBe(false);
-    expect(isOnBudgetAccount({ id: 'x', closed: true })).toBe(false);
+  it('keeps every non-closed account, on- and off-budget', () => {
+    expect(isIncludedAccount({ id: 'x' })).toBe(true);
+    expect(isIncludedAccount({ id: 'x', offbudget: true })).toBe(true);
+    expect(isIncludedAccount({ id: 'x', closed: true })).toBe(false);
   });
 });
 
@@ -114,7 +118,7 @@ describe('ActualConnector', () => {
     expect(await throwing.isReachable()).toBe(false);
   });
 
-  it('sums on-budget balances into major-unit spots, oldest-first', async () => {
+  it('sums all non-closed balances into major-unit spots, oldest-first', async () => {
     const seen: string[] = [];
     const connector = await ActualConnector.connect(
       ENV,
@@ -126,9 +130,27 @@ describe('ActualConnector', () => {
       }),
     );
     const points = await connector.getDailyBalances(2);
-    for (const p of points) expect(p.spot).toBe(150);
-    expect(seen.every((s) => s.startsWith('a1@') || s.startsWith('a2@'))).toBe(true);
-    expect(seen.some((s) => s.startsWith('a3@') || s.startsWith('a4@'))).toBe(false);
+    // a1 + a2 + off-budget a3 counted; closed a4 skipped.
+    for (const p of points) expect(p.spot).toBe(200);
+    expect(seen.some((s) => s.startsWith('a3@'))).toBe(true);
+    expect(seen.some((s) => s.startsWith('a4@'))).toBe(false);
+  });
+
+  it('honors excludedAccounts in balances and transactions', async () => {
+    const seen: string[] = [];
+    const connector = await ActualConnector.connect(
+      ENV,
+      fakeDeps({
+        getAccountBalance: async (id: string) => {
+          seen.push(id);
+          return 10_00;
+        },
+      }),
+    );
+    const points = await connector.getDailyBalances(1, { excludedAccounts: ['a3'] });
+    for (const p of points) expect(p.spot).toBe(20);
+    expect(seen).not.toContain('a3');
+    expect(seen).not.toContain('a4');
   });
 
   it('maps transactions with transfer flags, skipping split children', async () => {
@@ -143,10 +165,41 @@ describe('ActualConnector', () => {
       }),
     );
     const rows = await connector.getTransactions('2026-09-01');
-    expect(rows).toHaveLength(4);
+    // 3 included accounts × (2 kept rows each after skipping the split child).
+    expect(rows).toHaveLength(6);
     expect(rows[0]?.date).toBe('2026-09-01');
-    expect(rows.map((r) => r.isTransfer)).toEqual([true, true, false, false]);
+    expect(rows.map((r) => r.isTransfer)).toEqual([true, true, true, false, false, false]);
     expect(rows[0]?.amount).toBe(-2);
+    expect(rows.every((r) => typeof r.accountId === 'string')).toBe(true);
+    expect(rows.every((r) => r.categoryId === null)).toBe(true);
+  });
+
+  it('plumbs categoryId and accountId through transactions', async () => {
+    const connector = await ActualConnector.connect(
+      ENV,
+      fakeDeps({
+        getTransactions: async (accountId: string) => [
+          { date: '2026-09-02', amount: -500, category: 'c1' },
+        ],
+      }),
+    );
+    const rows = await connector.getTransactions('2026-09-01');
+    expect(rows).toHaveLength(3);
+    expect(rows.every((r) => r.categoryId === 'c1')).toBe(true);
+    expect(new Set(rows.map((r) => r.accountId)).size).toBe(3);
+  });
+
+  it('lists accounts with off-budget flags and categories for meta', async () => {
+    const connector = await ActualConnector.connect(ENV, fakeDeps());
+    expect(await connector.getAccounts()).toEqual([
+      { id: 'a1', name: 'Checking', offBudget: false },
+      { id: 'a2', name: 'Savings', offBudget: false },
+      { id: 'a3', name: 'Credit', offBudget: true },
+    ]);
+    expect(await connector.getCategories()).toEqual([
+      { id: 'c1', name: 'Groceries' },
+      { id: 'c2', name: 'Rent' },
+    ]);
   });
 
   it('resolves currency from prefs, env, then USD', async () => {

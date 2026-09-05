@@ -1,14 +1,15 @@
 import type Database from 'better-sqlite3';
 import { Router } from 'express';
+import type { ActualAdapter } from '../actualAdapter.js';
 import { rowToGoal, rowToWish } from '../db.js';
 import { impactOfWish } from '../math.js';
 import { getStats } from './stats.js';
 import { sendError } from './validate.js';
 
 /** GET /api/impact?wishId= → { perGoal, neverGoals }. */
-export function impactRouter(db: Database.Database): Router {
+export function impactRouter(db: Database.Database, adapter?: ActualAdapter): Router {
   const router = Router();
-  router.get('/', (req, res) => {
+  router.get('/', async (req, res) => {
     const wishId = req.query.wishId;
     if (typeof wishId !== 'string' || wishId.length === 0) {
       sendError(res, 400, 'wishId query param is required');
@@ -26,7 +27,7 @@ export function impactRouter(db: Database.Database): Router {
     const goalRows = db
       .prepare('SELECT id, name, target, priority, deadline FROM goals ORDER BY priority ASC')
       .all() as Parameters<typeof rowToGoal>[0][];
-    const stats = getStats(db);
+    const stats = await getStats(db, adapter);
     res.json(
       impactOfWish(rowToWish(wishRow), goalRows.map(rowToGoal), stats.avg30, stats.ratePerDay),
     );

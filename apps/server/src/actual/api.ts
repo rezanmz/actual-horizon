@@ -8,6 +8,7 @@ import {
   downloadBudget,
   getAccountBalance,
   getAccounts,
+  getCategories,
   getPreferences,
   getServerVersion,
   getTransactions,
@@ -18,6 +19,7 @@ import {
 
 import type {
   ActualAccount,
+  ActualCategory,
   ActualDeps,
   ActualTransaction,
   BudgetPreferences,
@@ -64,7 +66,13 @@ async function transactions(
     amount: row.amount,
     transfer_id: row.transfer_id,
     is_child: row.is_child,
+    category: row.category ?? null,
   }));
+}
+
+async function categories(): Promise<ActualCategory[]> {
+  const rows = await getCategories();
+  return rows.map((row) => ({ id: row.id, name: row.name }));
 }
 
 async function accounts(): Promise<ActualAccount[]> {
@@ -86,6 +94,7 @@ export const defaultActualDeps: ActualDeps = {
       : downloadBudget(syncId, { password: opts.password }),
   sync,
   getAccounts: accounts,
+  getCategories: categories,
   getAccountBalance: (id, cutoff) => getAccountBalance(id, cutoff),
   getTransactions: transactions,
   getServerVersion: serverVersion,

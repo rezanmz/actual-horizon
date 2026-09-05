@@ -39,21 +39,75 @@ export interface FlowTransaction {
   /** Signed amount: +inflow, -outflow. */
   amount: number;
   isTransfer?: boolean;
+  /** Owning account id (for account exclusions). */
+  accountId?: string;
+  /** Category id, null when uncategorized (for category exclusions). */
+  categoryId?: string | null;
 }
 
+/** Exclusion sets applied before any rate math. */
+export interface FlowExclusions {
+  excludedAccounts?: readonly string[];
+  excludedCategories?: readonly string[];
+}
+
+/**
+ * Drop excluded accounts/categories before math. Records without an
+ * accountId/categoryId are kept (unattributed flows still count).
+ */
+export function applyExclusions<T extends FlowTransaction>(
+  txs: readonly T[],
+  exclusions: FlowExclusions = {},
+): T[] {
+  const deniedAccounts = new Set(exclusions.excludedAccounts ?? []);
+  const deniedCategories = new Set(exclusions.excludedCategories ?? []);
+  if (deniedAccounts.size === 0 && deniedCategories.size === 0) return [...txs];
+  return txs.filter(
+    (tx) =>
+      (tx.accountId == null || !deniedAccounts.has(tx.accountId)) &&
+      (tx.categoryId == null || !deniedCategories.has(tx.categoryId)),
+  );
+}
 /** Net flow per day from signed transactions. */
 export function rateFromTransactions(
   txs: readonly FlowTransaction[],
   days: number,
   excludeTransfers = true,
 ): number {
-  if (!(days > 0)) return 0;
-  let net = 0;
+  return flowStats(txs, days, excludeTransfers).ratePerDay;
+}
+
+/** Auditable trailing-window breakdown: rate=(inflows-outflows)/days. */
+export interface WindowStats {
+  ratePerDay: number;
+  inflowPerDay: number;
+  outflowPerDay: number;
+  /** Non-transfer transactions counted in the window. */
+  txCount: number;
+}
+
+export function flowStats(
+  txs: readonly FlowTransaction[],
+  days: number,
+  excludeTransfers = true,
+): WindowStats {
+  const zero: WindowStats = { ratePerDay: 0, inflowPerDay: 0, outflowPerDay: 0, txCount: 0 };
+  if (!(days > 0)) return zero;
+  let inflow = 0;
+  let outflow = 0;
+  let txCount = 0;
   for (const tx of txs) {
     if (excludeTransfers && tx.isTransfer) continue;
-    net += tx.amount;
+    if (tx.amount >= 0) inflow += tx.amount;
+    else outflow -= tx.amount;
+    txCount += 1;
   }
-  return net / days;
+  return {
+    ratePerDay: (inflow - outflow) / days,
+    inflowPerDay: inflow / days,
+    outflowPerDay: outflow / days,
+    txCount,
+  };
 }
 
 /** Days from `avg` to reach `target` at `rate`/day, or null when drifting. */
