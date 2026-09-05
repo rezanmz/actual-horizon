@@ -3,11 +3,13 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { connectAdapterFromEnv } from './actual/index.js';
 import type { ActualAdapter } from './actualAdapter.js';
 import { openDb, resolveDbPath } from './db.js';
 import { goalsRouter } from './routes/goals.js';
 import { healthRouter } from './routes/health.js';
 import { impactRouter } from './routes/impact.js';
+import { appendDailySnapshot, backfillSnapshots } from './snapshots.js';
 import { snapshotsRouter } from './routes/snapshots.js';
 import { statsRouter } from './routes/stats.js';
 import { wishesRouter } from './routes/wishes.js';
@@ -60,7 +62,25 @@ const invokedAsMain =
 if (invokedAsMain) {
   const port = Number.parseInt(process.env.PORT ?? '3001', 10) || 3001;
   const dbPath = resolveDbPath();
-  const app = createApp({ db: openDb(dbPath) });
+  const db = openDb(dbPath);
+
+  // Actual sync is best-effort: without credentials (or when the sidecar is
+  // down) the server boots degraded and /api/health reports reachable:false.
+  const adapter = await connectAdapterFromEnv();
+  if (adapter != null) {
+    try {
+      await backfillSnapshots(db, adapter, 90);
+    } catch (err) {
+      console.warn(`actual backfill skipped: ${err instanceof Error ? err.message : 'unknown error'}`);
+    }
+    try {
+      await appendDailySnapshot(db, adapter);
+    } catch (err) {
+      console.warn(`actual snapshot skipped: ${err instanceof Error ? err.message : 'unknown error'}`);
+    }
+  }
+
+  const app = createApp({ db, adapter: adapter ?? undefined });
   app.listen(port, () => {
     console.log(`actual-horizon server listening on :${port} (db ${dbPath})`);
   });
