@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    name: typecheck (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: typecheck (skip when no workspaces yet)
+        run: |
+          has_ws=0
+          for f in apps/*/package.json packages/*/package.json; do
+            [ -e "$f" ] && has_ws=1
+          done
+          if [ "$has_ws" -eq 1 ]; then
+            npm run typecheck
+          else
+            echo "no workspaces yet — skipping typecheck"
+          fi
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: lint (skip when no workspaces yet)
+        run: |
+          has_ws=0
+          for f in apps/*/package.json packages/*/package.json; do
+            [ -e "$f" ] && has_ws=1
+          done
+          if [ "$has_ws" -eq 1 ]; then
+            npm run lint
+          else
+            echo "no workspaces yet — skipping lint"
+          fi
+
+  test:
+    name: test (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: test (skip when no workspaces yet)
+        run: |
+          has_ws=0
+          for f in apps/*/package.json packages/*/package.json; do
+            [ -e "$f" ] && has_ws=1
+          done
+          if [ "$has_ws" -eq 1 ]; then
+            npm test
+          else
+            echo "no workspaces yet — skipping test"
+          fi
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: build (skip when no workspaces yet)
+        run: |
+          has_ws=0
+          for f in apps/*/package.json packages/*/package.json; do
+            [ -e "$f" ] && has_ws=1
+          done
+          if [ "$has_ws" -eq 1 ]; then
+            npm run build
+          else
+            echo "no workspaces yet — skipping build"
+          fi
+
+  docker:
+    name: docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: actual-horizon:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

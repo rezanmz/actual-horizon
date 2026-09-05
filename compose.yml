@@ -1,0 +1,16 @@
+# Actual Horizon sidecar skeleton. Services land with their slices.
+services:
+  app:
+    build: .
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    environment:
+      ACTUAL_DATA_DIR: /app/data
+    volumes:
+      - actual-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  actual-data:
