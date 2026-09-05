@@ -22,7 +22,17 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
+      - name: typecheck (skip when no workspaces yet)
+        run: |
+          has_ws=0
+          for f in apps/*/package.json packages/*/package.json; do
+            [ -e "$f" ] && has_ws=1
+          done
+          if [ "$has_ws" -eq 1 ]; then
+            npm run typecheck
+          else
+            echo "no workspaces yet — skipping typecheck"
+          fi
 
   lint:
     name: lint
@@ -34,7 +44,17 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run lint
+      - name: lint (skip when no workspaces yet)
+        run: |
+          has_ws=0
+          for f in apps/*/package.json packages/*/package.json; do
+            [ -e "$f" ] && has_ws=1
+          done
+          if [ "$has_ws" -eq 1 ]; then
+            npm run lint
+          else
+            echo "no workspaces yet — skipping lint"
+          fi
 
   test:
     name: test (node ${{ matrix.node }})
@@ -49,7 +69,17 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
-      - run: npm test
+      - name: test (skip when no workspaces yet)
+        run: |
+          has_ws=0
+          for f in apps/*/package.json packages/*/package.json; do
+            [ -e "$f" ] && has_ws=1
+          done
+          if [ "$has_ws" -eq 1 ]; then
+            npm test
+          else
+            echo "no workspaces yet — skipping test"
+          fi
 
   build:
     name: build
@@ -61,7 +91,17 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run build
+      - name: build (skip when no workspaces yet)
+        run: |
+          has_ws=0
+          for f in apps/*/package.json packages/*/package.json; do
+            [ -e "$f" ] && has_ws=1
+          done
+          if [ "$has_ws" -eq 1 ]; then
+            npm run build
+          else
+            echo "no workspaces yet — skipping build"
+          fi
 
   docker:
     name: docker build
