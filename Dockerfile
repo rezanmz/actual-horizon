@@ -1,10 +1,12 @@
 # Actual Horizon sidecar. Workspaces under apps/ ride along so `npm ci`
 # installs workspace deps before the build stage typechecks.
+# Scripts stay enabled: better-sqlite3 needs its native bindings compiled
+# (prebuilds) — `--ignore-scripts` leaves the server unbootable.
 FROM node:24-slim AS base
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY apps ./apps
-RUN npm ci --ignore-scripts
+RUN npm ci
 
 FROM base AS build
 COPY . .
@@ -16,4 +18,4 @@ WORKDIR /app
 COPY --from=build /app ./
 EXPOSE 3001
 VOLUME ["/app/data"]
-CMD ["npm", "run", "dev", "--workspace", "apps/server"]
+CMD ["npm", "start", "--workspace", "apps/server"]
