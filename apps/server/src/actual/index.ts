@@ -22,3 +22,4 @@ export {
   endOfDayUTC,
   isOnBudgetAccount,
 } from './connector.js';
+export { connectAdapterFromEnv } from './boot.js';
