@@ -15,7 +15,9 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
   });
   if (!res.ok) throw new Error(`${init?.method ?? "GET"} ${path}: ${res.status}`);
-  return (await res.json()) as T;
+  // DELETE answers 204 with no body — only parse when there is one (#28).
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export const getHealth = () => req<Health>("/api/health");

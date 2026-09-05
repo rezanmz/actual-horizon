@@ -58,7 +58,9 @@ describe("all views smoke", () => {
     // Inbox wish is no longer stranded: it sits in the decision queue…
     expect(screen.getByText("Coffee subscription")).toBeInTheDocument();
     // …with the float delay rounded UP for display, in both row and preview.
-    expect(screen.getAllByText("6d", { exact: false })).toHaveLength(2);
+    // Countdown ceils to whole days (#28): a ~6d timer reads 6d, not 5d 23h.
+    expect(screen.getAllByText("6d", { exact: false })).toHaveLength(3);
+    expect(screen.getByText(/cools 6d/)).toBeInTheDocument();
     // Clear affordance: every undecided row offers a preview button.
     expect(screen.getAllByRole("button", { name: "Preview impact" })).toHaveLength(2);
     // Preview panel names the goal and the rounded slip.
