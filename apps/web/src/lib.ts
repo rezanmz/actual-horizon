@@ -39,11 +39,12 @@ export function cooldownRemainingMs(cooldownUntil: string | undefined, now: numb
 
 export function formatCountdown(ms: number): string {
   if (ms <= 0) return "ready now";
+  // cooldownUntil is a calendar date (midnight), so a fresh 7-day timer reads
+  // 6d 4h at best. Ceil to whole days: the rule counts days, not midnights.
+  if (ms >= 86_400_000) return `${Math.ceil(ms / 86_400_000)}d`;
   const mins = Math.floor(ms / 60000);
-  const d = Math.floor(mins / 1440);
-  const h = Math.floor((mins % 1440) / 60);
+  const h = Math.floor(mins / 60);
   const m = mins % 60;
-  if (d > 0) return `${d}d ${h}h`;
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
 }
