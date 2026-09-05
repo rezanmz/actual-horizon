@@ -1,4 +1,7 @@
-import type { Goal, Impact, MetaEntry, Settings, Snapshot, Stats, Wish } from "./types";
+import type { Goal, Impact, MetaEntry, Settings, Snapshot, Stats, Wish, WishStatus } from "./types";
+
+/** Wishes still awaiting a decision belong in the queue with a visible impact. */
+export const UNDECIDED_STATUSES: WishStatus[] = ["inbox", "cooling", "ready"];
 
 /** Pure helpers mirroring the frozen contract math (client-side display only). */
 

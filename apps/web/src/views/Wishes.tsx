@@ -1,17 +1,10 @@
 import { useEffect, useState } from "react";
 import type { Goal, Impact, Wish, WishCadence, WishStatus } from "../types";
 import { createWish, deleteWish, getImpact, listGoals, listWishes, updateWish } from "../api";
-import { cooldownRemainingMs, formatCountdown, formatMoney, maxDelay } from "../lib";
+import { cooldownRemainingMs, formatCountdown, formatMoney, maxDelay, UNDECIDED_STATUSES } from "../lib";
 
 const CADENCES: WishCadence[] = ["one-off", "daily", "weekly", "monthly"];
 const STATUSES: WishStatus[] = ["inbox", "cooling", "ready", "bought", "rejected"];
-
-/**
- * Issue #20: every wish still awaiting a decision belongs in the queue with a
- * visible impact — not just `cooling`. Single constant; adjust when the
- * backend status semantics land (RateFix owns create-in-cooling + ready).
- */
-export const UNDECIDED_STATUSES: WishStatus[] = ["inbox", "cooling", "ready"];
 
 export interface WishesData {
   wishes: Wish[];
