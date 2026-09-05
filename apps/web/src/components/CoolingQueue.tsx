@@ -1,33 +1,49 @@
 import type { Impact, Wish } from "../types";
-import { cooldownRemainingMs, formatCountdown, formatMoney, maxDelay } from "../lib";
+import { cooldownRemainingMs, delayDays, formatCountdown, formatMoney, maxDelay } from "../lib";
 
 interface Props {
   wishes: Wish[];
   impacts: Record<string, Impact>;
   currency: string;
+  ratePerDay?: number;
   now?: number;
 }
 
-export function CoolingQueue({ wishes, impacts, currency, now = Date.now() }: Props) {
+export function CoolingQueue({ wishes, impacts, currency, ratePerDay, now = Date.now() }: Props) {
   const cooling = wishes.filter((w) => w.status === "cooling");
-  if (cooling.length === 0) return <p>Cooling queue is empty.</p>;
+  if (cooling.length === 0)
+    return <p className="empty-note">Cooling queue is empty — nothing is waiting out its delay.</p>;
   return (
     <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
       {cooling.map((w) => {
-        const delay = maxDelay(impacts[w.id]);
+        const raw = maxDelay(impacts[w.id]) ?? (ratePerDay !== undefined ? delayDays(w.price, ratePerDay) : null);
+        const delay = raw === null ? null : Math.ceil(raw);
         const remain = cooldownRemainingMs(w.cooldownUntil, now);
+        const ready = remain !== null && remain <= 0;
         return (
-          <li
-            key={w.id}
-            style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 8 }}
-          >
-            <span>
-              <strong>{w.name}</strong> · {formatMoney(w.price, currency)}
-              {w.cadence !== "one-off" ? ` · ${w.cadence}` : ""}
+          <li key={w.id} className="ledger-row">
+            <span className="row-main">
+              <span className="row-name">{w.name}</span>
+              <br />
+              <span className="row-meta">
+                <span className="mono">{formatMoney(w.price, currency)}</span>
+                {w.cadence !== "one-off" ? ` · ${w.cadence}` : ""}
+                {remain !== null ? (
+                  <>
+                    {" "}·{" "}
+                    <span className={`due-flag${ready ? " ok" : ""}`}>
+                      {ready ? "ready" : `cools ${formatCountdown(remain)}`}
+                    </span>
+                  </>
+                ) : null}
+              </span>
             </span>
-            <span style={{ fontSize: 12, color: "#555", textAlign: "right" }}>
-              {remain !== null ? <span>cooldown {formatCountdown(remain)} · </span> : null}
-              {delay !== null ? `delays goals by ${delay}d` : "impact n/a"}
+            <span className="row-side">
+              {delay !== null ? (
+                <span className="delay-pill">+{delay}d slip</span>
+              ) : (
+                <span className="mono">impact n/a</span>
+              )}
             </span>
           </li>
         );

@@ -33,13 +33,14 @@ describe("dashboard smoke", () => {
     // Spot vs avg chart lines + rate trend chart render SVGs.
     expect(screen.getAllByTestId("line-chart")).toHaveLength(2);
 
-    // Goals with progress + dates.
+    // Goals with progress + dates (funded goals read "funded", not "0 days →").
     expect(screen.getByText("Emergency fund")).toBeInTheDocument();
-    expect(screen.getAllByText(/days →/)).toHaveLength(2);
+    expect(screen.getByText(/77 days →/)).toBeInTheDocument();
+    expect(screen.getByText("funded")).toBeInTheDocument();
 
-    // Cooling queue with delayDays.
+    // Cooling queue with rounded delay pill.
     expect(screen.getByText("Headphones")).toBeInTheDocument();
-    expect(screen.getByText(/delays goals by 8d/)).toBeInTheDocument();
+    expect(screen.getByText("+8d slip")).toBeInTheDocument();
 
     // Health badge from the contract shape.
     expect(screen.getByText(/Actual 26\.9\.0/)).toBeInTheDocument();

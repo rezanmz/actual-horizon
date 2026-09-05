@@ -8,13 +8,18 @@ export interface Stats {
   avg30: number;
   ratePerDay: number;
   currency: string;
+  /** Additive honesty fields (frozen contract #18): present once the backend lands. */
+  inflowPerDay?: number;
+  outflowPerDay?: number;
+  windowDays?: number;
+  txCount?: number;
 }
 
 export interface Snapshot {
   date: string;
   spot: number;
   avg: number;
-  rate: number;
+  rate: number | null;
 }
 
 export interface Goal {
@@ -51,4 +56,23 @@ export interface ImpactGoal {
 export interface Impact {
   perGoal: ImpactGoal[];
   neverGoals: string[];
+}
+
+/** Frozen contract #18: ledger settings. */
+export interface CooldownRule {
+  maxPrice: number | null;
+  days: number;
+}
+
+export interface Settings {
+  lookbackDays: number;
+  excludedAccounts: string[];
+  excludedCategories: string[];
+  cooldownRules: CooldownRule[];
+  currency: string;
+}
+
+export interface MetaEntry {
+  id: string;
+  name: string;
 }
