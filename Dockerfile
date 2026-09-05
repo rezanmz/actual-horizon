@@ -16,6 +16,6 @@ FROM node:24-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /app ./
-EXPOSE 3000
+EXPOSE 3001
 VOLUME ["/app/data"]
 CMD ["npm", "run", "dev", "--workspace", "apps/server"]
