@@ -1,0 +1,10 @@
+node_modules
+apps/*/node_modules
+apps/*/dist
+dist
+.git
+.gitignore
+.env
+.env.*
+*.local
+npm-debug.log
