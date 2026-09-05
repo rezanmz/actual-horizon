@@ -76,7 +76,7 @@ export function Wishes({ initial, currency = "USD" }: Props) {
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const w = await createWish({ name, price: Number(price), cadence, status: "inbox" });
+      const w = await createWish({ name, price: Number(price), cadence, status: "cooling" });
       setWishes((prev) => [...prev, w]);
       setName("");
       setPrice("");
@@ -138,6 +138,11 @@ export function Wishes({ initial, currency = "USD" }: Props) {
           <h2>Awaiting decision</h2>
           <span className="sub">{undecided.length} wishes</span>
         </div>
+        <p className="legend">
+          New wishes start <strong>cooling</strong> — the waiting timer from your rules. When it runs out they turn{" "}
+          <strong>ready</strong> for a decision. <strong>Inbox</strong> parks an idea with no timer.{" "}
+          <strong>Bought</strong> / <strong>rejected</strong> close it out below.
+        </p>
         {error && (
           <p role="alert" className="alert">
             {error}
