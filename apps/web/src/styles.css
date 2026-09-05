@@ -1,0 +1,19 @@
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+  color: #1a1a1a;
+}
+h2 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+a {
+  color: #1f6feb;
+}
+button,
+select,
+input {
+  font: inherit;
+}
