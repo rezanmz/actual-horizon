@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import type { Goal, Health, Impact, Snapshot, Stats, Wish } from "../types";
 import { getHealth, getImpact, getSnapshots, getStats, listGoals, listWishes } from "../api";
-import { formatMoney } from "../lib";
+import { formatMoney, UNDECIDED_STATUSES } from "../lib";
 import { LineChart } from "../components/LineChart";
 import { GoalsPanel } from "../components/GoalsPanel";
 import { CoolingQueue } from "../components/CoolingQueue";
+import { TotalDelay } from "../components/TotalDelay";
 
 export interface DashboardData {
   stats: Stats;
@@ -35,10 +36,10 @@ export function Dashboard({ initial }: Props) {
           listWishes(),
           getHealth().catch((): Health | null => null),
         ]);
-        const cooling = wishes.filter((w) => w.status === "cooling");
+        const undecided = wishes.filter((w) => UNDECIDED_STATUSES.includes(w.status));
         const impacts: Record<string, Impact> = {};
         await Promise.all(
-          cooling.map(async (w) => {
+          undecided.map(async (w) => {
             try {
               impacts[w.id] = await getImpact(w.id);
             } catch {
@@ -159,6 +160,15 @@ export function Dashboard({ initial }: Props) {
             currency={stats.currency}
             ratePerDay={stats.ratePerDay}
           />
+        </section>
+
+        <section className="entry span-12 rise" style={{ ["--d" as string]: "350ms" }} data-testid="total-delay-panel">
+          <div className="entry-head">
+            <span className="entry-no">05</span>
+            <h2>Total delay</h2>
+            <span className="sub">what the whole queue costs each goal</span>
+          </div>
+          <TotalDelay goals={goals} wishes={wishes} impacts={impacts} snapshots={snapshots} avg={stats.avg30} rate={stats.ratePerDay} />
         </section>
       </div>
 

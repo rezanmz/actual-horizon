@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Dashboard } from "./views/Dashboard";
 import {
@@ -29,14 +29,21 @@ describe("dashboard smoke", () => {
     expect(screen.getByTestId("rate-panel")).toBeInTheDocument();
     expect(screen.getByTestId("goals-panel")).toBeInTheDocument();
     expect(screen.getByTestId("cooling-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("total-delay-panel")).toBeInTheDocument();
 
     // Spot vs avg chart lines + rate trend chart render SVGs.
     expect(screen.getAllByTestId("line-chart")).toHaveLength(2);
 
     // Goals with progress + dates (funded goals read "funded", not "0 days →").
-    expect(screen.getByText("Emergency fund")).toBeInTheDocument();
+    expect(within(screen.getByTestId("goals-panel")).getByText("Emergency fund")).toBeInTheDocument();
     expect(screen.getByText(/77 days →/)).toBeInTheDocument();
     expect(screen.getByText("funded")).toBeInTheDocument();
+
+    // Total delay aggregates the queue: fixture w1 pushes both goals 8d.
+    const totalPanel = screen.getByTestId("total-delay-panel");
+    expect(within(totalPanel).getByText("Emergency fund").closest("li")).toHaveTextContent("+8d");
+    // Fixture snapshots span 29d — under the 30d retrospective threshold.
+    expect(within(totalPanel).getAllByText(/building history/).length).toBeGreaterThan(0);
 
     // Cooling queue with rounded delay pill.
     expect(screen.getByText("Headphones")).toBeInTheDocument();
