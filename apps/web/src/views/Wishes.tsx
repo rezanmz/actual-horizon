@@ -127,7 +127,7 @@ export function Wishes({ initial, currency = "USD" }: Props) {
     <div className="ledger-grid">
       <section className="entry span-7 rise" style={{ ["--d" as string]: "0ms" }} aria-label="Wishes awaiting decision">
         <div className="entry-head">
-          <span className="entry-no">06</span>
+          
           <h2>Awaiting decision</h2>
           <span className="sub">{undecided.length} wishes</span>
         </div>
@@ -200,7 +200,7 @@ export function Wishes({ initial, currency = "USD" }: Props) {
         {settled.length > 0 && (
           <>
             <div className="entry-head" style={{ marginTop: 20 }}>
-              <span className="entry-no">07</span>
+              
               <h2>Settled</h2>
               <span className="sub">{settled.length} closed</span>
             </div>
@@ -238,7 +238,7 @@ export function Wishes({ initial, currency = "USD" }: Props) {
       <div className="span-5" style={{ display: "flex", flexDirection: "column", gap: 18, minWidth: 0 }}>
         <section className="entry rise accent-top" style={{ ["--d" as string]: "80ms" }} data-testid="impact-preview" aria-label="Impact preview">
           <div className="entry-head">
-            <span className="entry-no">08</span>
+            
             <h2>Impact preview</h2>
           </div>
           {!selected ? (
