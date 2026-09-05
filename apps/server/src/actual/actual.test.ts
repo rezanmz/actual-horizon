@@ -219,6 +219,14 @@ describe('ActualConnector', () => {
     expect(await fallback.getCurrency()).toBe('USD');
   });
 
+  it('treats blank currency codes as missing', async () => {
+    const blank = await ActualConnector.connect(
+      ENV,
+      fakeDeps({ getPreferences: async () => ({ defaultCurrencyCode: '  ' }) }),
+    );
+    expect(await blank.getCurrency()).toBe('USD');
+  });
+
   it('shuts down after failed setup', async () => {
     let shutdowns = 0;
     await expect(
