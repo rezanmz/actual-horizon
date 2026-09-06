@@ -274,11 +274,15 @@ function CooldownEditor({
           <label className="field">
             <span>{r.maxPrice === null ? "And everything above (no cap)" : "Up to price"}</span>
             <input
+              value={r.maxPrice ?? ""}
               placeholder={r.maxPrice === null ? "no cap" : "max price"}
               inputMode="decimal"
               aria-label={`cooldown tier ${i + 1} max price`}
               onChange={(e) => {
                 const v = e.target.value;
+                // Autosaves on every keystroke: ignore non-numeric input so a
+                // half-typed value can't persist as null (no cap).
+                if (v !== "" && !Number.isFinite(Number(v))) return;
                 const next = [...rules];
                 next[i] = {
                   ...next[i],

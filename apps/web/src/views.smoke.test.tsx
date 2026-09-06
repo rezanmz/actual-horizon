@@ -120,4 +120,37 @@ describe("all views smoke", () => {
       expect.objectContaining({ method: "PUT", body: JSON.stringify({ lookbackDays: 90 }) }),
     );
   });
+
+  it("settings cooldown tiers display values and PUT numeric edits", async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      const patch = JSON.parse(String(init?.body ?? "{}"));
+      return Response.json({ ...fixtureSettings, ...patch });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <MemoryRouter>
+        <Settings
+          initial={{ settings: fixtureSettings, accounts: [], categories: [], metaReachable: false }}
+        />
+      </MemoryRouter>,
+    );
+    // Saved tiers are visible (max-price inputs are value-bound).
+    expect(screen.getByLabelText("cooldown tier 1 max price")).toHaveValue("50");
+    fireEvent.change(screen.getByLabelText("cooldown tier 1 max price"), { target: { value: "75" } });
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/settings",
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({
+            cooldownRules: [
+              { maxPrice: 75, days: 3 },
+              { maxPrice: 500, days: 7 },
+              { maxPrice: null, days: 30 },
+            ],
+          }),
+        }),
+      ),
+    );
+  });
 });
