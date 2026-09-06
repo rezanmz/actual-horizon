@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/rezanmz/actual-horizon/compare/actual-horizon-v1.1.0...actual-horizon-v1.1.1) (2026-09-06)
+
+
+### Bug Fixes
+
+* **ui:** cooldown tier inputs show values and reject non-numeric ([#35](https://github.com/rezanmz/actual-horizon/issues/35)) ([1ef811c](https://github.com/rezanmz/actual-horizon/commit/1ef811c2dfe98aabc76e3f8065d92985abc9904d))
+
 ## [1.1.0](https://github.com/rezanmz/actual-horizon/compare/actual-horizon-v1.0.0...actual-horizon-v1.1.0) (2026-09-05)
 
 
