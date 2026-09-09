@@ -495,6 +495,22 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   gap: 8px;
   flex-wrap: wrap;
 }
+.btn.small.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+.dash-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.timeframe-group {
+  display: flex;
+  gap: 6px;
+}
 
 /* Impact table */
 .impact-table {

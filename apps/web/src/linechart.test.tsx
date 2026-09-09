@@ -50,3 +50,14 @@ describe("LineChart hover readout (#30)", () => {
     expect(screen.queryByTestId("chart-tip")).toBeNull();
   });
 });
+
+describe("LineChart x axis (#37)", () => {
+  it("renders formatted tick labels for first and last points", () => {
+    render(
+      <LineChart series={series} labels={labels} formatX={(iso) => `X:${iso.slice(8)}`} xTickCount={2} />,
+    );
+    const axis = screen.getByTestId("chart-x-axis");
+    expect(within(axis).getByText("X:01")).toBeInTheDocument();
+    expect(within(axis).getByText("X:04")).toBeInTheDocument();
+  });
+});

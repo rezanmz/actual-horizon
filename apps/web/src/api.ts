@@ -24,6 +24,14 @@ export const getHealth = () => req<Health>("/api/health");
 export const getStats = () => req<Stats>("/api/stats");
 export const getSnapshots = (days = 90) =>
   req<Snapshot[]>(`/api/snapshots?days=${encodeURIComponent(String(days))}`);
+export interface SyncResult {
+  ok: boolean;
+  syncedAt: string;
+  days: number;
+  snapshots: Snapshot[];
+}
+export const postSync = (days = 180) =>
+  req<SyncResult>(`/api/sync?days=${encodeURIComponent(String(days))}`, { method: "POST" });
 export const getImpact = (wishId: string) =>
   req<Impact>(`/api/impact?wishId=${encodeURIComponent(wishId)}`);
 

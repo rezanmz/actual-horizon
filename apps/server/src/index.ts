@@ -14,6 +14,7 @@ import { metaRouter } from './routes/meta.js';
 import { settingsRouter } from './routes/settings.js';
 import { snapshotsRouter } from './routes/snapshots.js';
 import { statsRouter } from './routes/stats.js';
+import { syncRouter } from './routes/sync.js';
 import { wishesRouter } from './routes/wishes.js';
 
 export interface AppOptions {
@@ -34,6 +35,7 @@ export function createApp(options: AppOptions = {}): express.Express {
   app.use('/api/health', healthRouter(options.adapter));
   app.use('/api/stats', statsRouter(db, options.adapter));
   app.use('/api/snapshots', snapshotsRouter(db));
+  app.use('/api/sync', syncRouter(db, options.adapter));
   app.use('/api/goals', goalsRouter(db));
   app.use('/api/wishes', wishesRouter(db));
   app.use('/api/impact', impactRouter(db, options.adapter));
