@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/rezanmz/actual-horizon/compare/actual-horizon-v1.1.1...actual-horizon-v1.2.0) (2026-09-09)
+
+
+### Features
+
+* on-demand sync with chart timeframes and axis labels ([#38](https://github.com/rezanmz/actual-horizon/issues/38)) ([784f248](https://github.com/rezanmz/actual-horizon/commit/784f2481a0745a9a71e050a01e28941839b756b9))
+
 ## [1.1.1](https://github.com/rezanmz/actual-horizon/compare/actual-horizon-v1.1.0...actual-horizon-v1.1.1) (2026-09-06)
 
 
