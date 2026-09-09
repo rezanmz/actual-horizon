@@ -30,3 +30,29 @@ describe("req empty bodies (#28)", () => {
     fetchSpy.mockRestore();
   });
 });
+
+describe("chart timeframes (#37)", () => {
+  it("formats day precision on short ranges, month-year on long ones", async () => {
+    const { formatXLabel } = await import("./lib");
+    expect(formatXLabel("2026-09-05", 30)).toBe("Sep 5");
+    expect(formatXLabel("2026-09-05", 90)).toBe("Sep 5");
+    expect(formatXLabel("2026-09-05", 365)).toBe("Sep ’26");
+  });
+
+  it("keeps daily points on short ranges, buckets weekly and monthly", async () => {
+    const { bucketSnapshots } = await import("./lib");
+    const mk = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        date: `2026-01-${String(i + 1).padStart(2, "0")}`,
+        spot: 100 + i,
+        avg: 100 + i,
+        rate: 10 as number | null,
+      }));
+    expect(bucketSnapshots(mk(30), 30)).toHaveLength(30);
+    // 90 days → weekly buckets of 7.
+    expect(bucketSnapshots(mk(90), 90)).toHaveLength(13);
+    // 365-day span in one month prefix → monthly buckets.
+    const monthly = mk(65).map((s, i) => ({ ...s, date: `2026-${String(Math.floor(i / 28) + 1).padStart(2, "0")}-15` }));
+    expect(bucketSnapshots(monthly, 365).length).toBeLessThan(monthly.length);
+  });
+});

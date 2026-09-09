@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Goal, Health, Impact, Snapshot, Stats, Wish } from "../types";
-import { getHealth, getImpact, getSnapshots, getStats, listGoals, listWishes } from "../api";
-import { formatMoney, UNDECIDED_STATUSES } from "../lib";
+import { getHealth, getImpact, getSnapshots, getStats, listGoals, listWishes, postSync } from "../api";
+import { TIMEFRAMES, bucketSnapshots, formatMoney, formatXLabel, UNDECIDED_STATUSES } from "../lib";
 import { LineChart } from "../components/LineChart";
 import { GoalsPanel } from "../components/GoalsPanel";
 import { CoolingQueue } from "../components/CoolingQueue";
@@ -20,34 +20,43 @@ interface Props {
   initial?: DashboardData;
 }
 
+async function loadAll(days: number): Promise<DashboardData> {
+  const [stats, snapshots, goals, wishes, health] = await Promise.all([
+    getStats(),
+    getSnapshots(days),
+    listGoals(),
+    listWishes(),
+    getHealth().catch((): Health | null => null),
+  ]);
+  const undecided = wishes.filter((w) => UNDECIDED_STATUSES.includes(w.status));
+  const impacts: Record<string, Impact> = {};
+  await Promise.all(
+    undecided.map(async (w) => {
+      try {
+        impacts[w.id] = await getImpact(w.id);
+      } catch {
+        /* leave missing; panel shows n/a */
+      }
+    }),
+  );
+  return { stats, snapshots, goals, wishes, impacts, health };
+}
+
 export function Dashboard({ initial }: Props) {
   const [data, setData] = useState<DashboardData | null>(initial ?? null);
   const [error, setError] = useState<string | null>(null);
+  const [days, setDays] = useState<number>(90);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [syncedAt, setSyncedAt] = useState<string | null>(null);
 
   useEffect(() => {
     if (initial) return;
     let live = true;
     (async () => {
       try {
-        const [stats, snapshots, goals, wishes, health] = await Promise.all([
-          getStats(),
-          getSnapshots(90),
-          listGoals(),
-          listWishes(),
-          getHealth().catch((): Health | null => null),
-        ]);
-        const undecided = wishes.filter((w) => UNDECIDED_STATUSES.includes(w.status));
-        const impacts: Record<string, Impact> = {};
-        await Promise.all(
-          undecided.map(async (w) => {
-            try {
-              impacts[w.id] = await getImpact(w.id);
-            } catch {
-              /* leave missing; panel shows n/a */
-            }
-          }),
-        );
-        if (live) setData({ stats, snapshots, goals, wishes, impacts, health });
+        const fresh = await loadAll(days);
+        if (live) setData(fresh);
       } catch (e) {
         if (live) setError(e instanceof Error ? e.message : "failed to load");
       }
@@ -55,13 +64,34 @@ export function Dashboard({ initial }: Props) {
     return () => {
       live = false;
     };
-  }, [initial]);
+  }, [initial, days]);
+
+  async function refresh() {
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      const result = await postSync(days);
+      const fresh = await loadAll(days);
+      // Prefer the just-synced window when the follow-up read agrees.
+      if (result.snapshots.length > 0) fresh.snapshots = result.snapshots;
+      setData(fresh);
+      setSyncedAt(result.syncedAt);
+    } catch (e) {
+      setRefreshError(e instanceof Error ? e.message : "refresh failed");
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   if (error) return <p role="alert" className="alert">Dashboard failed to load: {error}</p>;
   if (!data) return <p className="loading-line">Opening the ledger…</p>;
-
   const { stats, snapshots, goals, wishes, impacts, health } = data;
-  const labels = snapshots.map((s) => s.date);
+  const bucketed = bucketSnapshots(snapshots, days);
+  const labels = bucketed.map((s) => s.date);
+  const formatX = (iso: string) => formatXLabel(iso, days);
+  const bucketNote =
+    days <= 62 ? "daily" : days <= 200 ? "weekly buckets" : "monthly buckets";
+  const rangeNote = labels.length > 0 ? `${labels[0]} → ${labels[labels.length - 1]}` : "";
   const ratePositive = stats.ratePerDay > 0;
   const windowNote =
     stats.windowDays !== undefined
@@ -70,6 +100,38 @@ export function Dashboard({ initial }: Props) {
 
   return (
     <div>
+      <div className="dash-controls" data-testid="dash-controls">
+        <div role="group" aria-label="Chart timeframe" className="timeframe-group">
+          {TIMEFRAMES.map((t) => (
+            <button
+              key={t.days}
+              type="button"
+              className={t.days === days ? "btn small active" : "btn small ghost"}
+              aria-pressed={t.days === days}
+              onClick={() => setDays(t.days)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="btn small"
+          onClick={refresh}
+          disabled={refreshing}
+          data-testid="refresh-button"
+        >
+          {refreshing ? "Refreshing…" : "Refresh now"}
+        </button>
+        <span className="row-meta" data-testid="refresh-note">
+          {refreshError ??
+            (syncedAt
+              ? `synced ${syncedAt.slice(0, 16).replace("T", " ")} · ${bucketed.length} points`
+              : labels.length > 0
+                ? `data through ${labels[labels.length - 1]} · ${bucketed.length} points`
+                : "no history yet")}
+        </span>
+      </div>
       <section className="figures rise" style={{ ["--d" as string]: "0ms" }} aria-label="Position summary">
         <div className="figure">
           <div className="k">Net worth · spot</div>
@@ -110,14 +172,15 @@ export function Dashboard({ initial }: Props) {
           <div className="entry-head">
             
             <h2>Position — spot vs trailing avg</h2>
-            <span className="sub">{labels.length > 0 ? `${labels[0]} → ${labels[labels.length - 1]}` : ""}</span>
+            <span className="sub">{rangeNote} · {bucketNote}</span>
           </div>
           <LineChart
             labels={labels}
             formatTick={(v) => formatMoney(v, stats.currency)}
+            formatX={formatX}
             series={[
-              { label: "spot", color: "#1c1611", values: snapshots.map((s) => s.spot) },
-              { label: "avg", color: "#b23a1d", values: snapshots.map((s) => s.avg) },
+              { label: "spot", color: "#1c1611", values: bucketed.map((s) => s.spot) },
+              { label: "avg", color: "#b23a1d", values: bucketed.map((s) => s.avg) },
             ]}
           />
         </section>
@@ -126,19 +189,19 @@ export function Dashboard({ initial }: Props) {
           <div className="entry-head">
             
             <h2>Save-rate trend</h2>
-            <span className="sub">{snapshots.length} readings</span>
+            <span className="sub">{bucketed.length} readings · {bucketNote}</span>
           </div>
           <LineChart
             labels={labels}
             formatTick={(v) => `${formatMoney(v, stats.currency)}/d`}
-            series={[{ label: "rate/day", color: "#2e6b4f", values: snapshots.map((s) => s.rate) }]}
+            formatX={formatX}
+            series={[{ label: "rate/day", color: "#2e6b4f", values: bucketed.map((s) => s.rate) }]}
           />
           <p className="row-meta" style={{ marginTop: 10 }}>
             Averaged over the {windowNote}: every wish below is priced against this rate, so a
             short-window spike can’t quietly promise what the ledger can’t pay.
           </p>
         </section>
-
         <section className="entry span-7 rise" style={{ ["--d" as string]: "210ms" }} data-testid="goals-panel">
           <div className="entry-head">
             

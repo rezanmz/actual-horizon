@@ -239,3 +239,26 @@ describe('partial PATCH updates (#24)', () => {
     expect(patched.body).toMatchObject({ id, name: 'Fund', target: 2000 });
   });
 });
+
+describe('on-demand sync (#37)', () => {
+  it('503s when Actual is unreachable', async () => {
+    const base = await serve(memDb());
+    const { status, body } = await json(`${base}/api/sync?days=30`, { method: 'POST' });
+    expect(status).toBe(503);
+    expect(body).toEqual({ error: 'actual unreachable' });
+  });
+
+  it('backfills and returns fresh snapshots when reachable', async () => {
+    const base = await serve(memDb(), LIVE);
+    const { status, body } = await json(`${base}/api/sync?days=7`, { method: 'POST' });
+    expect(status).toBe(200);
+    const payload = body as { ok: boolean; syncedAt: string; days: number; snapshots: unknown[] };
+    expect(payload.ok).toBe(true);
+    expect(payload.days).toBe(7);
+    expect(typeof payload.syncedAt).toBe('string');
+    expect(payload.snapshots.length).toBeGreaterThan(0);
+    // Persisted: a plain snapshots read sees the same rows.
+    const reread = (await json(`${base}/api/snapshots?days=7`)).body as unknown[];
+    expect(reread.length).toBe(payload.snapshots.length);
+  });
+});

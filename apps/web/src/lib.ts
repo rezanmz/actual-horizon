@@ -51,12 +51,65 @@ export function formatCountdown(ms: number): string {
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
 }
+/** Chart timeframes driving /api/snapshots?days=. */
+export const TIMEFRAMES = [
+  { days: 30, label: "30d" },
+  { days: 90, label: "90d" },
+  { days: 180, label: "6m" },
+  { days: 365, label: "1y" },
+] as const;
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Adaptive x label: day precision on short ranges, month + year once buckets go monthly. */
+export function formatXLabel(iso: string, spanDays: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  if (spanDays > 200) return `${MONTHS[m - 1]} ’${String(y).slice(2)}`;
+  return `${MONTHS[m - 1]} ${d}`;
+}
+
+/**
+ * Downsample daily snapshots for long ranges so a 560px chart stays readable:
+ * daily ≤62 points, weekly ≤200d, monthly beyond. Spot = bucket close,
+ * avg/rate = bucket means (rate ignores nulls).
+ */
+export function bucketSnapshots(snapshots: Snapshot[], spanDays: number): Snapshot[] {
+  if (snapshots.length === 0) return [];
+  const width = spanDays <= 62 ? 1 : spanDays <= 200 ? 7 : -1;
+  if (width === 1) return snapshots;
+  const buckets: Snapshot[][] = [];
+  if (width === -1) {
+    let cur: Snapshot[] = [];
+    let key = "";
+    for (const s of snapshots) {
+      const k = s.date.slice(0, 7);
+      if (k !== key) {
+        if (cur.length > 0) buckets.push(cur);
+        cur = [];
+        key = k;
+      }
+      cur.push(s);
+    }
+    if (cur.length > 0) buckets.push(cur);
+  } else {
+    for (let i = 0; i < snapshots.length; i += width) buckets.push(snapshots.slice(i, i + width));
+  }
+  return buckets.map((b) => {
+    const rates = b.map((s) => s.rate).filter((r): r is number => r !== null);
+    return {
+      date: b[0].date,
+      spot: b[b.length - 1].spot,
+      avg: b.reduce((a, s) => a + s.avg, 0) / b.length,
+      rate: rates.length > 0 ? rates.reduce((a, r) => a + r, 0) / rates.length : null,
+    };
+  });
+}
 
 export function maxDelay(impact: Impact | undefined): number | null {
   if (!impact || impact.perGoal.length === 0) return null;
-  return Math.max(...impact.perGoal.map((g) => g.delayDays));
+  return Math.max(...impact.perGoal.map((p) => p.delayDays));
 }
-
 /** Fixture data matching the contract shapes; used by the smoke test and local dev. */
 export const fixtureStats: Stats = {
   spot: 12400,

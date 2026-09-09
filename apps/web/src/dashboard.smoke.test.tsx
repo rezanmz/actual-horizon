@@ -30,7 +30,9 @@ describe("dashboard smoke", () => {
     expect(screen.getByTestId("goals-panel")).toBeInTheDocument();
     expect(screen.getByTestId("cooling-panel")).toBeInTheDocument();
     expect(screen.getByTestId("total-delay-panel")).toBeInTheDocument();
-
+    expect(screen.getByTestId("dash-controls")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Chart timeframe" })).toBeInTheDocument();
+    expect(screen.getByTestId("refresh-button")).toHaveTextContent("Refresh now");
     // Spot vs avg chart lines + rate trend chart render SVGs.
     expect(screen.getAllByTestId("line-chart")).toHaveLength(2);
 

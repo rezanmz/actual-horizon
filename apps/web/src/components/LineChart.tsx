@@ -11,10 +11,15 @@ interface Props {
   labels: string[];
   height?: number;
   formatTick?: (v: number) => string;
+  /** Format an ISO date label for the x axis; defaults to the raw label. */
+  formatX?: (iso: string) => string;
+  /** Max tick labels along the x axis (default 5). */
+  xTickCount?: number;
 }
 
 /** Hand-rolled SVG ledger chart: hairline grid, ink lines, accent endpoint, hover readout. */
-export function LineChart({ series, labels, height = 170, formatTick }: Props) {
+export function LineChart({ series, labels, height = 170, formatTick, formatX, xTickCount = 5 }: Props) {
+
   const [hover, setHover] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const width = 560;
@@ -26,8 +31,9 @@ export function LineChart({ series, labels, height = 170, formatTick }: Props) {
   const span = max - min || 1;
   const n = Math.max(...series.map((s) => s.values.length), 1);
 
+  const xAxisH = 18;
   const x = (i: number) => (n === 1 ? padL : padL + (i * (width - padL - pad)) / (n - 1));
-  const y = (v: number) => pad + (1 - (v - min) / span) * (height - pad * 2);
+  const y = (v: number) => pad + (1 - (v - min) / span) * (height - pad - xAxisH);
 
   const points = (values: (number | null)[]) =>
     values
@@ -52,6 +58,12 @@ export function LineChart({ series, labels, height = 170, formatTick }: Props) {
 
   const gridVals = [0, 0.5, 1].map((t) => min + t * span);
   const fmt = formatTick ?? ((v: number) => String(Math.round(v)));
+  const fmtX = formatX ?? ((iso: string) => iso);
+  const tickCount = Math.max(2, Math.min(xTickCount, n));
+  const tickIdx =
+    n <= 1
+      ? [0]
+      : Array.from({ length: tickCount }, (_, k) => Math.round((k * (n - 1)) / (tickCount - 1)));
 
   return (
     <figure style={{ margin: 0, position: "relative" }}>
@@ -102,7 +114,7 @@ export function LineChart({ series, labels, height = 170, formatTick }: Props) {
               x1={x(hovered)}
               x2={x(hovered)}
               y1={pad}
-              y2={height - pad}
+              y2={height - xAxisH}
               stroke="#8a7f6f"
               strokeWidth={1}
               strokeDasharray="2 2"
@@ -114,6 +126,21 @@ export function LineChart({ series, labels, height = 170, formatTick }: Props) {
             })}
           </g>
         )}
+        <g data-testid="chart-x-axis">
+          {tickIdx.map((i) => (
+            <text
+              key={i}
+              x={x(i)}
+              y={height - 5}
+              textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"}
+              fontSize={9}
+              fill="#8a7f6f"
+              fontFamily="IBM Plex Mono, monospace"
+            >
+              {fmtX(labels[i] ?? "")}
+            </text>
+          ))}
+        </g>
       </svg>
       {hovered !== null && (
         <div
