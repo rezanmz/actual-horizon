@@ -3,9 +3,11 @@ name: Docker
 on:
   push:
     branches: [main]
-    tags: ["v*"]
+    tags: ["v*", "actual-horizon-v*"]
+  release:
+    types: [published]
   pull_request:
-
+  workflow_dispatch:
 permissions:
   contents: read
   packages: write
