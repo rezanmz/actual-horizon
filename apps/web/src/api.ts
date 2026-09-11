@@ -24,14 +24,32 @@ export const getHealth = () => req<Health>("/api/health");
 export const getStats = () => req<Stats>("/api/stats");
 export const getSnapshots = (days = 90) =>
   req<Snapshot[]>(`/api/snapshots?days=${encodeURIComponent(String(days))}`);
-export interface SyncResult {
-  ok: boolean;
-  syncedAt: string;
-  days: number;
-  snapshots: Snapshot[];
+export type SyncStatus = "idle" | "running" | "done" | "error";
+export interface SyncState {
+  status: SyncStatus;
+  days?: number;
+  startedAt?: string;
+  finishedAt?: string;
+  syncedAt?: string;
+  count?: number;
+  error?: string;
 }
+/** Starts (or joins) a background sync; answers 202 immediately (#46). */
 export const postSync = (days = 180) =>
-  req<SyncResult>(`/api/sync?days=${encodeURIComponent(String(days))}`, { method: "POST" });
+  req<SyncState>(`/api/sync?days=${encodeURIComponent(String(days))}`, { method: "POST" });
+export const getSyncState = () => req<SyncState>("/api/sync");
+/** Polls until the sync leaves `running`; rejects on job error or timeout. */
+export async function awaitSyncDone(timeoutMs = 120_000, intervalMs = 1000): Promise<SyncState> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const state = await getSyncState();
+    if (state.status === "done") return state;
+    if (state.status === "error") throw new Error(state.error ?? "sync failed");
+    if (state.status !== "running") return state;
+    if (Date.now() >= deadline) throw new Error("sync timed out");
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+}
 export const getImpact = (wishId: string) =>
   req<Impact>(`/api/impact?wishId=${encodeURIComponent(wishId)}`);
 

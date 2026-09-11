@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import DatabaseImpl from 'better-sqlite3';
 import type { AddressInfo } from 'node:net';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ActualAdapter } from './actualAdapter.js';
 import { initDb } from './db.js';
@@ -240,7 +241,30 @@ describe('partial PATCH updates (#24)', () => {
   });
 });
 
-describe('on-demand sync (#37)', () => {
+describe('background sync (#46)', () => {
+  /** Adapter with an observably slow backfill: sleeps longer than any fast-path handler. */
+  const SLOW: ActualAdapter = {
+    ...LIVE,
+    getDailyBalances: async (days: number) => {
+      await sleep(400);
+      return LIVE.getDailyBalances(days);
+    },
+  };
+
+  async function syncState(base: string): Promise<{ status: string } & Record<string, unknown>> {
+    return (await json(`${base}/api/sync`)).body as { status: string } & Record<string, unknown>;
+  }
+
+  async function waitForDone(base: string): Promise<Record<string, unknown>> {
+    for (let i = 0; i < 100; i += 1) {
+      const state = await syncState(base);
+      if (state.status === 'done') return state;
+      expect(state.status).not.toBe('error');
+      await sleep(50);
+    }
+    throw new Error('sync never finished');
+  }
+
   it('503s when Actual is unreachable', async () => {
     const base = await serve(memDb());
     const { status, body } = await json(`${base}/api/sync?days=30`, { method: 'POST' });
@@ -248,17 +272,33 @@ describe('on-demand sync (#37)', () => {
     expect(body).toEqual({ error: 'actual unreachable' });
   });
 
-  it('backfills and returns fresh snapshots when reachable', async () => {
-    const base = await serve(memDb(), LIVE);
-    const { status, body } = await json(`${base}/api/sync?days=7`, { method: 'POST' });
-    expect(status).toBe(200);
-    const payload = body as { ok: boolean; syncedAt: string; days: number; snapshots: unknown[] };
-    expect(payload.ok).toBe(true);
-    expect(payload.days).toBe(7);
-    expect(typeof payload.syncedAt).toBe('string');
-    expect(payload.snapshots.length).toBeGreaterThan(0);
-    // Persisted: a plain snapshots read sees the same rows.
+  it('answers 202 immediately and finishes in the background', async () => {
+    const base = await serve(memDb(), SLOW);
+    const began = Date.now();
+    const post = await json(`${base}/api/sync?days=7`, { method: 'POST' });
+    // The whole point of #46: the handler returns while the job still runs.
+    expect(Date.now() - began).toBeLessThan(300);
+    expect(post.status).toBe(202);
+    expect(post.body).toMatchObject({ status: 'running', days: 7 });
+    // Health stays live mid-sync — this is what the k8s probes hit.
+    const health = await json(`${base}/api/health`);
+    expect(health.status).toBe(200);
+    expect(await syncState(base)).toMatchObject({ status: 'running' });
+    const done = await waitForDone(base);
+    expect(done).toMatchObject({ status: 'done', days: 7 });
+    // Persisted: a plain snapshots read sees the synced rows.
     const reread = (await json(`${base}/api/snapshots?days=7`)).body as unknown[];
-    expect(reread.length).toBe(payload.snapshots.length);
+    expect(reread.length).toBeGreaterThan(0);
+  });
+
+  it('joins a second POST onto the running job (single-flight)', async () => {
+    const base = await serve(memDb(), SLOW);
+    const first = (await json(`${base}/api/sync?days=7`, { method: 'POST' })).body as Record<string, unknown>;
+    const second = (await json(`${base}/api/sync?days=30`, { method: 'POST' })).body as Record<string, unknown>;
+    expect(first.status).toBe('running');
+    expect(second.status).toBe('running');
+    expect(second.startedAt).toBe(first.startedAt);
+    const done = await waitForDone(base);
+    expect(done.days).toBe(7);
   });
 });

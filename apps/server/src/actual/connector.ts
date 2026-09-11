@@ -6,6 +6,7 @@
  * until both PRs land, then wires this connector in.
  */
 
+import { setImmediate as setImmediateYield } from 'node:timers/promises';
 import { defaultActualDeps } from './api.js';
 import {
   EXPECTED_ACTUAL_VERSION,
@@ -131,6 +132,8 @@ export class ActualConnector {
       let totalMinor = 0;
       for (const b of balances) totalMinor += b;
       points.push({ date, spot: this.toMajor(totalMinor) });
+      // Yield between dates so long backfills never starve probes (#46).
+      await yieldToLoop();
     }
     return points;
   }
@@ -163,10 +166,13 @@ export class ActualConnector {
           categoryId: row.category ?? null,
         });
       }
+      // Yield between accounts; large histories arrive in per-account chunks.
+      await yieldToLoop();
     }
     out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     return out;
   }
+
 
   /** Budget currency: budget prefs, else ACTUAL_CURRENCY, else USD. Blank counts as missing (#23). */
   async getCurrency(): Promise<string> {
@@ -200,4 +206,8 @@ export class ActualConnector {
     const accounts = await this.deps.getAccounts();
     return accounts.filter((a) => isIncludedAccount(a) && !denied.has(a.id));
   }
+}
+/** Let pending I/O (health probes, other requests) run between read slices. */
+async function yieldToLoop(): Promise<void> {
+  await setImmediateYield();
 }
