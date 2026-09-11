@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1](https://github.com/rezanmz/actual-horizon/compare/actual-horizon-v1.2.0...actual-horizon-v1.2.1) (2026-09-11)
+
+
+### Bug Fixes
+
+* **ci:** publish images on releases and component tags ([#43](https://github.com/rezanmz/actual-horizon/issues/43)) ([74e27a8](https://github.com/rezanmz/actual-horizon/commit/74e27a845b1675fcafe579c91a5a650d28a71d32))
+* **sync:** background single-flight sync with linear-time rates ([#47](https://github.com/rezanmz/actual-horizon/issues/47)) ([db66ee7](https://github.com/rezanmz/actual-horizon/commit/db66ee7022385b2a489bc21e1298ae7296d8a94f))
+
 ## [1.2.0](https://github.com/rezanmz/actual-horizon/compare/actual-horizon-v1.1.1...actual-horizon-v1.2.0) (2026-09-09)
 
 
