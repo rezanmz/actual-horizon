@@ -24,6 +24,20 @@ no personal data, secrets, or real budget exports in issues, PRs, or commits.
 
 The PR template lists the required checks — make sure they are green.
 
+## Maintainer setup: versioned image automation
+
+`release-please` runs with `RELEASE_PLEASE_TOKEN` (a classic PAT with the
+`repo` scope) so its tags/releases cascade into the Docker workflow and
+versioned images publish automatically. Without it the workflow falls back
+to `github.token`, which still cuts releases but needs a manual `vX.Y.Z`
+tag push per release to build the image. To enable:
+
+1. Create a PAT (classic, `repo` scope) at <https://github.com/settings/tokens>.
+2. Add it as the `RELEASE_PLEASE_TOKEN` repo secret
+   (`gh secret set RELEASE_PLEASE_TOKEN`).
+
+The PR template lists the required checks — make sure they are green.
+
 ## Local setup
 
 ```sh
