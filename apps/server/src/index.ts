@@ -9,18 +9,19 @@ import { openDb, resolveDbPath } from './db.js';
 import { goalsRouter } from './routes/goals.js';
 import { healthRouter } from './routes/health.js';
 import { impactRouter } from './routes/impact.js';
-import { appendDailySnapshot, backfillSnapshots } from './snapshots.js';
+import { createSyncJob, syncRouter, type SyncJob } from './routes/sync.js';
 import { metaRouter } from './routes/meta.js';
 import { settingsRouter } from './routes/settings.js';
 import { snapshotsRouter } from './routes/snapshots.js';
 import { statsRouter } from './routes/stats.js';
-import { syncRouter } from './routes/sync.js';
 import { wishesRouter } from './routes/wishes.js';
 
 export interface AppOptions {
   db?: Database.Database;
   /** Actual sidecar adapter (Auth-owned impl). Absent → reachable:false. */
   adapter?: ActualAdapter;
+  /** Shared background sync job; defaults to a fresh idle job. */
+  syncJob?: SyncJob;
   /** Skip the apps/web/dist static hook (tests). */
   skipStatic?: boolean;
 }
@@ -35,7 +36,7 @@ export function createApp(options: AppOptions = {}): express.Express {
   app.use('/api/health', healthRouter(options.adapter));
   app.use('/api/stats', statsRouter(db, options.adapter));
   app.use('/api/snapshots', snapshotsRouter(db));
-  app.use('/api/sync', syncRouter(db, options.adapter));
+  app.use('/api/sync', syncRouter(db, options.adapter, options.syncJob));
   app.use('/api/goals', goalsRouter(db));
   app.use('/api/wishes', wishesRouter(db));
   app.use('/api/impact', impactRouter(db, options.adapter));
@@ -73,21 +74,11 @@ if (invokedAsMain) {
   // Actual sync is best-effort: without credentials (or when the sidecar is
   // down) the server boots degraded and /api/health reports reachable:false.
   const adapter = await connectAdapterFromEnv();
-  if (adapter != null) {
-    try {
-      await backfillSnapshots(db, adapter, 90);
-    } catch (err) {
-      console.warn(`actual backfill skipped: ${err instanceof Error ? err.message : 'unknown error'}`);
-    }
-    try {
-      await appendDailySnapshot(db, adapter);
-    } catch (err) {
-      console.warn(`actual snapshot skipped: ${err instanceof Error ? err.message : 'unknown error'}`);
-    }
-  }
-
-  const app = createApp({ db, adapter: adapter ?? undefined });
+  const syncJob = adapter != null ? createSyncJob(db, adapter) : undefined;
+  const app = createApp({ db, adapter: adapter ?? undefined, syncJob });
   app.listen(port, () => {
     console.log(`actual-horizon server listening on :${port} (db ${dbPath})`);
   });
+  // Backfill after listen — never delay readiness on a slow Actual (#46).
+  syncJob?.start(90);
 }

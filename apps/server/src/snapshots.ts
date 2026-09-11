@@ -1,3 +1,4 @@
+import { setImmediate as setImmediateYield } from 'node:timers/promises';
 import type Database from 'better-sqlite3';
 import { getSettings } from './settings.js';
 import { addDaysIso, applyExclusions, rateFromTransactions, avg30, todayIsoUtc } from './math.js';
@@ -117,6 +118,11 @@ export async function appendDailySnapshot(
  * flows bucket locally per day, so each stored rate is the true
  * trailing-lookback net ending that day — not a single spike on today.
  * Throws on adapter failure so callers can surface it.
+ *
+ * Cost is O(flows + days·log flows): prefix sums over the sorted
+ * non-transfer flows answer every window, and upserts land in small
+ * transactions with a macrotask yield between chunks so long backfills
+ * never starve the event loop (#46).
  */
 export async function backfillSnapshots(
   db: Database.Database,
@@ -133,13 +139,74 @@ export async function backfillSnapshots(
   );
   const visible = applyExclusions(txs, { excludedCategories: resolved.excludedCategories });
   const sorted = [...visible].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-
+  const rates = slidingRates(sorted, balances, resolved.lookbackDays);
   const upsert = db.prepare(UPSERT_SNAPSHOT);
-  const fill = db.transaction(() => {
-    for (const b of balances) {
-      upsert.run(b.date, b.spot, trailingRate(sorted, b.date, resolved.lookbackDays));
-    }
-  });
-  fill();
+  for (let i = 0; i < balances.length; i += UPSERT_CHUNK) {
+    const dates = balances.slice(i, i + UPSERT_CHUNK);
+    const values = rates.slice(i, i + UPSERT_CHUNK);
+    db.transaction(() => {
+      for (let j = 0; j < dates.length; j++) upsert.run(dates[j]!.date, dates[j]!.spot, values[j] ?? 0);
+    })();
+    await yieldToLoop();
+  }
   return readSnapshots(db, days);
 }
+
+/** Upserts per synchronous transaction; small enough to keep each tick short. */
+const UPSERT_CHUNK = 25;
+
+/** Let pending I/O (health probes, other requests) run between work slices. */
+async function yieldToLoop(): Promise<void> {
+  await setImmediateYield();
+}
+
+/**
+ * Trailing-lookback rate per balance date via prefix sums over the
+ * date-sorted non-transfer flows. Identical math to calling
+ * `trailingRate(flows, date, lookbackDays)` per date, in linear total time.
+ * Returns rates aligned with `balances` (no date-keyed lookup needed).
+ */
+function slidingRates(
+  sorted: readonly Pick<FlowRecord, 'date' | 'amount' | 'isTransfer'>[],
+  balances: readonly { date: string }[],
+  lookbackDays: number,
+): number[] {
+  const dates: string[] = [];
+  const prefix: number[] = [0];
+  for (const tx of sorted) {
+    if (tx.isTransfer) continue;
+    dates.push(tx.date);
+    prefix.push((prefix[prefix.length - 1] ?? 0) + tx.amount);
+  }
+  return balances.map((b) => {
+    const startIso = addDaysIso(b.date, -(lookbackDays - 1));
+    const lo = lowerBound(dates, startIso);
+    const hi = upperBound(dates, b.date);
+    return ((prefix[hi] ?? 0) - (prefix[lo] ?? 0)) / lookbackDays;
+  });
+}
+
+/** First index with `dates[i] >= target` (ISO dates sort lexicographically). */
+function lowerBound(dates: readonly string[], target: string): number {
+  let lo = 0;
+  let hi = dates.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (dates[mid]! < target) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/** First index with `dates[i] > target`. */
+function upperBound(dates: readonly string[], target: string): number {
+  let lo = 0;
+  let hi = dates.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (dates[mid]! <= target) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+

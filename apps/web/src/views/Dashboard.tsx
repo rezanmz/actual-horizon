@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Goal, Health, Impact, Snapshot, Stats, Wish } from "../types";
-import { getHealth, getImpact, getSnapshots, getStats, listGoals, listWishes, postSync } from "../api";
+import { awaitSyncDone, getHealth, getImpact, getSnapshots, getStats, listGoals, listWishes, postSync } from "../api";
 import { TIMEFRAMES, bucketSnapshots, formatMoney, formatXLabel, UNDECIDED_STATUSES } from "../lib";
 import { LineChart } from "../components/LineChart";
 import { GoalsPanel } from "../components/GoalsPanel";
@@ -70,12 +70,13 @@ export function Dashboard({ initial }: Props) {
     setRefreshing(true);
     setRefreshError(null);
     try {
-      const result = await postSync(days);
+      // POST only starts the background job (#46); wait for it, then read.
+      const started = await postSync(days);
+      if (started.status === "error") throw new Error(started.error ?? "sync failed");
+      const finished = await awaitSyncDone();
       const fresh = await loadAll(days);
-      // Prefer the just-synced window when the follow-up read agrees.
-      if (result.snapshots.length > 0) fresh.snapshots = result.snapshots;
       setData(fresh);
-      setSyncedAt(result.syncedAt);
+      setSyncedAt(finished.syncedAt ?? new Date().toISOString());
     } catch (e) {
       setRefreshError(e instanceof Error ? e.message : "refresh failed");
     } finally {

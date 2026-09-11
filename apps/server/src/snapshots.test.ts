@@ -147,3 +147,19 @@ describe('backfillSnapshots', () => {
     expect(filtered[0]?.rate).toBe(10);
   });
 });
+
+describe('backfill sliding rates (#46)', () => {
+  it('matches per-window trailingRate on ragged flows with transfers', async () => {
+    const flows: FlowRecord[] = [
+      { date: '2026-08-20', amount: 500, isTransfer: false, accountId: 'a1', categoryId: null },
+      { date: '2026-08-25', amount: -120.5, isTransfer: false, accountId: 'a1', categoryId: null },
+      { date: '2026-08-25', amount: 9999, isTransfer: true, accountId: 'a1', categoryId: null },
+      { date: '2026-09-01', amount: 75.25, isTransfer: false, accountId: 'a1', categoryId: null },
+      { date: '2026-09-04', amount: -30, isTransfer: false, accountId: 'a1', categoryId: null },
+    ];
+    const adapter: ActualAdapter = { ...fakeAdapter(0), getTransactions: async () => flows };
+    const points = await backfillSnapshots(memDb(), adapter, 10, { lookbackDays: 30 }, TODAY);
+    expect(points).toHaveLength(10);
+    for (const p of points) expect(p.rate).toBe(trailingRate(flows, p.date, 30));
+  });
+});
