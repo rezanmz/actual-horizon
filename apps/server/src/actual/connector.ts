@@ -115,6 +115,15 @@ export class ActualConnector {
   }
 
   /**
+   * Pull server changes into the local cache (#50). Boot-only
+   * `downloadBudget` is deliberately not re-run here: it is destructive
+   * to the local file and `sync()` is incremental.
+   */
+  async sync(): Promise<void> {
+    await this.deps.sync();
+  }
+
+  /**
    * Daily closing spot balances (major units), oldest-first, ending today.
    * Sums the included universe (all non-closed accounts minus exclusions);
    * one balance read per account per day.

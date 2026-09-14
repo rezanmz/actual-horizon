@@ -12,6 +12,8 @@ export interface SyncJobState {
   startedAt?: string;
   finishedAt?: string;
   syncedAt?: string;
+  /** ISO time the Actual server pull completed on the last run (#50). */
+  pulledAt?: string;
   /** Snapshots backfilled by the last run. */
   count?: number;
   error?: string;
@@ -37,10 +39,14 @@ export function createSyncJob(db: Database.Database, adapter?: ActualAdapter): S
     state = { status: 'running', days, startedAt };
     try {
       if (adapter == null) throw new Error('actual unreachable');
+      // Pull from the Actual server before any reads (#50): without this the
+      // job only recomputes snapshots from the boot-time local cache.
+      await adapter.sync();
+      const pulledAt = new Date().toISOString();
       const points = await backfillSnapshots(db, adapter, days);
       await appendDailySnapshot(db, adapter);
       const syncedAt = new Date().toISOString();
-      state = { status: 'done', days, startedAt, finishedAt: syncedAt, syncedAt, count: points.length };
+      state = { status: 'done', days, startedAt, finishedAt: syncedAt, syncedAt, pulledAt, count: points.length };
     } catch (err) {
       state = {
         status: 'error',

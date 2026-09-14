@@ -19,6 +19,7 @@ function fakeAdapter(dailyNet: number, spot = 1000, txAccount = 'a1'): ActualAda
   return {
     getVersion: async () => '26.9.0',
     isReachable: async () => true,
+    sync: async () => {},
     getDailyBalances: async (days: number) => {
       const dates: { date: string; spot: number }[] = [];
       for (let i = days - 1; i >= 0; i -= 1) dates.push({ date: addDaysIso(TODAY, -i), spot });

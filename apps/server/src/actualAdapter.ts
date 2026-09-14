@@ -52,6 +52,12 @@ export interface ActualAdapter {
   getVersion(): Promise<string>;
   /** False when the sidecar is unreachable — callers must degrade, not throw. */
   isReachable(): Promise<boolean>;
+  /**
+   * Fetch changes from the Actual server into the local cache (#50).
+   * Incremental and cheap compared to the boot-only `downloadBudget`;
+   * callers must treat a throw as "server unreachable", not as data.
+   */
+  sync(): Promise<void>;
   /** Daily spot balances, oldest-first, up to `days` entries. */
   getDailyBalances(days: number, filter?: UniverseFilter): Promise<DailyBalance[]>;
   /** Signed transactions on/after `sinceIso` (YYYY-MM-DD), oldest-first. */

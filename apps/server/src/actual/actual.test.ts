@@ -118,6 +118,26 @@ describe('ActualConnector', () => {
     expect(await throwing.isReachable()).toBe(false);
   });
 
+  it('sync() re-pulls through deps.sync() without a boot re-download', async () => {
+    const calls: string[] = [];
+    const connector = await ActualConnector.connect(
+      ENV,
+      fakeDeps({
+        downloadBudget: async () => {
+          calls.push('download');
+        },
+        sync: async () => {
+          calls.push('sync');
+        },
+      }),
+    );
+    // connect() does exactly one boot download + pull.
+    expect(calls).toEqual(['download', 'sync']);
+    await connector.sync();
+    // The refresh pull is incremental: deps.sync() again, never downloadBudget.
+    expect(calls).toEqual(['download', 'sync', 'sync']);
+  });
+
   it('sums all non-closed balances into major-unit spots, oldest-first', async () => {
     const seen: string[] = [];
     const connector = await ActualConnector.connect(
