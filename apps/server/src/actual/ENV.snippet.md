@@ -14,6 +14,9 @@ ACTUAL_PASSWORD=change-me
 # ACTUAL_DATA_DIR=./data/actual
 # Fallback ISO currency when the budget has none set (optional, default USD).
 # ACTUAL_CURRENCY=USD
+# IANA zone for chart day boundaries (optional, #53). Unset → process-local
+# zone (TZ env var), then UTC. Invalid names fail the connection explicitly.
+# ACTUAL_TIMEZONE=America/Toronto
 ```
 
 Notes:

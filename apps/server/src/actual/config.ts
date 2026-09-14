@@ -2,6 +2,7 @@
 
 /** Actual Budget release this connector targets. Keep in sync with apps/server deps. */
 export const EXPECTED_ACTUAL_VERSION = '26.9.0';
+import { resolveTimeZone } from '../timezone.js';
 
 export interface ActualConfig {
   serverURL: string;
@@ -13,6 +14,11 @@ export interface ActualConfig {
   dataDir: string | undefined;
   /** Fallback ISO currency code when the budget has none set. */
   currency: string | undefined;
+  /**
+   * IANA zone for all day-boundary math (#53). ACTUAL_TIMEZONE when set;
+   * otherwise the process-local zone (TZ-aware), falling back to UTC.
+   */
+  timezone: string;
 }
 
 export interface ActualEnv {
@@ -22,6 +28,7 @@ export interface ActualEnv {
   ACTUAL_TOKEN?: string | undefined;
   ACTUAL_DATA_DIR?: string | undefined;
   ACTUAL_CURRENCY?: string | undefined;
+  ACTUAL_TIMEZONE?: string | undefined;
 }
 
 function required(value: string | undefined, name: string): string {
@@ -65,6 +72,7 @@ export function loadActualConfig(env: ActualEnv = process.env): ActualConfig {
     token,
     dataDir: optional(env.ACTUAL_DATA_DIR),
     currency: optional(env.ACTUAL_CURRENCY),
+    timezone: resolveTimeZone(env),
   };
 }
 
@@ -77,5 +85,6 @@ export function redactConfig(config: ActualConfig): Record<string, string> {
     token: config.token === undefined ? '(unset)' : '(set)',
     dataDir: config.dataDir ?? '(default)',
     currency: config.currency ?? '(budget default)',
+    timezone: config.timezone,
   };
 }

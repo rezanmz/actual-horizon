@@ -1,7 +1,8 @@
 import { setImmediate as setImmediateYield } from 'node:timers/promises';
 import type Database from 'better-sqlite3';
 import { getSettings } from './settings.js';
-import { addDaysIso, applyExclusions, rateFromTransactions, avg30, todayIsoUtc } from './math.js';
+import { addDaysIso, applyExclusions, rateFromTransactions, avg30 } from './math.js';
+import { todayInZone } from './timezone.js';
 import type { ActualAdapter, FlowRecord } from './actualAdapter.js';
 
 export interface SnapshotPoint {
@@ -36,7 +37,7 @@ function resolveOptions(db: Database.Database, opts: SnapshotOptions): Required<
     lookbackDays: opts.lookbackDays ?? settings.lookbackDays,
     excludedAccounts: opts.excludedAccounts ?? settings.excludedAccounts,
     excludedCategories: opts.excludedCategories ?? settings.excludedCategories,
-    todayIso: opts.todayIso ?? todayIsoUtc(),
+    todayIso: opts.todayIso ?? todayInZone(),
   };
 }
 
@@ -82,7 +83,7 @@ export function trailingRate(
 export async function appendDailySnapshot(
   db: Database.Database,
   adapter: ActualAdapter,
-  todayIso: string = todayIsoUtc(),
+  todayIso: string = todayInZone(),
   opts: Omit<SnapshotOptions, 'todayIso'> = {},
 ): Promise<SnapshotPoint | null> {
   const resolved = resolveOptions(db, { ...opts, todayIso });
@@ -129,7 +130,7 @@ export async function backfillSnapshots(
   adapter: ActualAdapter,
   days = 90,
   opts: Omit<SnapshotOptions, 'todayIso'> = {},
-  todayIso: string = todayIsoUtc(),
+  todayIso: string = todayInZone(),
 ): Promise<SnapshotPoint[]> {
   const resolved = resolveOptions(db, { ...opts, todayIso });
   const balances = await adapter.getDailyBalances(days, { excludedAccounts: resolved.excludedAccounts });
