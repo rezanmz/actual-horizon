@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest';
-
+import { isoDay } from '../timezone.js';
 import { loadActualConfig, redactConfig } from './config.js';
 import {
   ActualConnector,
-  endOfDayUTC,
   isIncludedAccount,
-  lastNDatesUTC,
-  toISODateUTC,
   validateDays,
   validateIsoDate,
 } from './connector.js';
@@ -71,20 +68,23 @@ describe('loadActualConfig', () => {
     expect(JSON.stringify(redacted)).not.toContain('secret');
     expect(redacted['password']).toBe('(set)');
   });
+
+  it('resolves ACTUAL_TIMEZONE (#53)', () => {
+    expect(loadActualConfig(ENV).timezone).toBe(
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+    );
+    expect(loadActualConfig({ ...ENV, ACTUAL_TIMEZONE: 'America/Toronto' }).timezone).toBe(
+      'America/Toronto',
+    );
+    expect(() => loadActualConfig({ ...ENV, ACTUAL_TIMEZONE: 'Toronto' })).toThrow(/IANA/);
+  });
 });
 
 describe('date helpers', () => {
-  it('lists oldest-first UTC dates ending today', () => {
-    const dates = lastNDatesUTC(3, new Date('2026-09-05T12:00:00Z'));
-    expect(dates).toEqual(['2026-09-03', '2026-09-04', '2026-09-05']);
-    expect(toISODateUTC(new Date('2026-09-05T00:00:00Z'))).toBe('2026-09-05');
-  });
-
   it('validates ranges and formats', () => {
     expect(() => validateDays(0)).toThrow(/days/);
     expect(() => validateDays(366)).toThrow(/days/);
     expect(() => validateIsoDate('05-09-2026', 'sinceIso')).toThrow(/YYYY-MM-DD/);
-    expect(endOfDayUTC('2026-09-05').toISOString()).toBe('2026-09-05T23:59:59.999Z');
   });
 
   it('keeps every non-closed account, on- and off-budget', () => {
@@ -136,6 +136,32 @@ describe('ActualConnector', () => {
     await connector.sync();
     // The refresh pull is incremental: deps.sync() again, never downloadBudget.
     expect(calls).toEqual(['download', 'sync', 'sync']);
+  });
+
+  it('charts and closes days in ACTUAL_TIMEZONE, not UTC (#53)', async () => {
+    const cutoffs = new Set<string>();
+    let transactionEnd = '';
+    const connector = await ActualConnector.connect(
+      { ...ENV, ACTUAL_TIMEZONE: 'America/Toronto' },
+      fakeDeps({
+        getAccountBalance: async (_id: string, cutoff: Date) => {
+          cutoffs.add(cutoff.toISOString());
+          return 100;
+        },
+        getTransactions: async (_accountId: string, _since: string, end: string) => {
+          transactionEnd = end;
+          return [];
+        },
+      }),
+    );
+    await connector.getDailyBalances(2);
+    await connector.getTransactions('2020-01-01');
+    // Each chart day closes at 23:59:59.999 Toronto time (03:59/04:59 UTC)
+    // — the pre-#53 UTC close of T23:59:59.999Z froze "today" at 8pm local.
+    expect(cutoffs.size).toBe(2);
+    for (const iso of cutoffs) expect(iso).toMatch(/T0[34]:59:59\.999Z$/);
+    // Transaction reads run through the end of local today.
+    expect(transactionEnd).toBe(isoDay(new Date(), 'America/Toronto'));
   });
 
   it('sums all non-closed balances into major-unit spots, oldest-first', async () => {

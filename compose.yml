@@ -8,6 +8,8 @@ services:
       - .env
     environment:
       ACTUAL_DATA_DIR: /app/data
+      # Empty → zone resolution falls back to TZ / process-local (#53).
+      ACTUAL_TIMEZONE: ${ACTUAL_TIMEZONE:-}
     volumes:
       - actual-data:/app/data
     restart: unless-stopped

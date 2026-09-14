@@ -21,44 +21,15 @@ import type {
   MinorToMajor,
   SnapshotPoint,
 } from './types.js';
+import {
+  endOfDay,
+  isoDay,
+  lastNDates,
+  validateDays,
+  validateIsoDate,
+} from '../timezone.js';
 
-const MAX_DAYS = 365;
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-export function validateDays(days: number): number {
-  if (!Number.isInteger(days) || days < 1 || days > MAX_DAYS) {
-    throw new Error(`Invalid days ${JSON.stringify(days)}: integer 1..${MAX_DAYS}`);
-  }
-  return days;
-}
-
-export function validateIsoDate(value: string, name: string): string {
-  if (!ISO_DATE.test(value)) {
-    throw new Error(`Invalid ${name} ${JSON.stringify(value)}: expected YYYY-MM-DD`);
-  }
-  return value;
-}
-
-/** YYYY-MM-DD for a Date in UTC. */
-export function toISODateUTC(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-/** Oldest-first UTC date list ending today, length `days`. */
-export function lastNDatesUTC(days: number, today: Date = new Date()): string[] {
-  validateDays(days);
-  const end = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
-  const out: string[] = [];
-  for (let i = days - 1; i >= 0; i -= 1) {
-    out.push(toISODateUTC(new Date(end - i * 86_400_000)));
-  }
-  return out;
-}
-
-/** End-of-day UTC cutoff for getAccountBalance (inclusive of the whole date). */
-export function endOfDayUTC(date: string): Date {
-  return new Date(`${validateIsoDate(date, 'date')}T23:59:59.999Z`);
-}
+export { validateDays, validateIsoDate };
 
 /**
  * Net-worth universe: every non-closed account, on- AND off-budget.
@@ -131,10 +102,11 @@ export class ActualConnector {
   async getDailyBalances(days: number, filter: { excludedAccounts?: readonly string[] } = {}): Promise<SnapshotPoint[]> {
     validateDays(days);
     const accounts = await this.includedAccounts(filter.excludedAccounts);
-    const dates = lastNDatesUTC(days);
+    // Chart days and their closes are evaluated in the configured zone (#53).
+    const dates = lastNDates(days, this.config.timezone);
     const points: SnapshotPoint[] = [];
     for (const date of dates) {
-      const cutoff = endOfDayUTC(date);
+      const cutoff = endOfDay(date, this.config.timezone);
       const balances = await Promise.all(
         accounts.map((a) => this.deps.getAccountBalance(a.id, cutoff)),
       );
@@ -159,7 +131,7 @@ export class ActualConnector {
     filter: { excludedAccounts?: readonly string[] } = {},
   ): Promise<FlowTransaction[]> {
     const since = validateIsoDate(sinceIso, 'sinceIso');
-    const end = toISODateUTC(new Date());
+    const end = isoDay(new Date(), this.config.timezone);
     const accounts = await this.includedAccounts(filter.excludedAccounts);
     const out: FlowTransaction[] = [];
     for (const account of accounts) {

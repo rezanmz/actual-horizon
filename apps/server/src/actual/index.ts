@@ -17,9 +17,6 @@ export {
   ActualConnector,
   validateDays,
   validateIsoDate,
-  toISODateUTC,
-  lastNDatesUTC,
-  endOfDayUTC,
   isIncludedAccount,
 } from './connector.js';
 export { connectAdapterFromEnv } from './boot.js';

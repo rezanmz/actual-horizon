@@ -1,3 +1,4 @@
+import { todayInZone } from './timezone.js';
 import type { Cadence, Goal, Wish } from './types.js';
 
 /** Reference Actual version this backend is built against. */
@@ -128,10 +129,6 @@ export interface GoalProjection {
   status: GoalDateStatus;
 }
 
-export function todayIsoUtc(now: Date = new Date()): string {
-  return now.toISOString().slice(0, 10);
-}
-
 /** Whole calendar days from today; rounds fractional days up. */
 export function addDaysIso(todayIso: string, days: number): string {
   const ms = Date.parse(`${todayIso}T00:00:00.000Z`);
@@ -148,7 +145,7 @@ export function projectWaterfall(
   goals: readonly Goal[],
   avg: number,
   rate: number,
-  todayIso: string = todayIsoUtc(),
+  todayIso: string = todayInZone(),
 ): GoalProjection[] {
   const ordered = [...goals].sort((a, b) => a.priority - b.priority);
   if (!(rate > 0)) {
@@ -198,7 +195,7 @@ export function impactOfWish(
   goals: readonly Goal[],
   avg: number,
   rate: number,
-  todayIso: string = todayIsoUtc(),
+  todayIso: string = todayInZone(),
 ): ImpactResult {
   const ordered = [...goals].sort((a, b) => a.priority - b.priority);
   const old = projectWaterfall(ordered, avg, rate, todayIso);

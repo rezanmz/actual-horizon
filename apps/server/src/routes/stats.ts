@@ -2,7 +2,8 @@ import type Database from 'better-sqlite3';
 import { Router } from 'express';
 import type { ActualAdapter } from '../actualAdapter.js';
 import { getSetting } from '../db.js';
-import { addDaysIso, applyExclusions, avg30, flowStats, todayIsoUtc } from '../math.js';
+import { addDaysIso, applyExclusions, avg30, flowStats } from '../math.js';
+import { todayInZone } from '../timezone.js';
 import { getSettings } from '../settings.js';
 
 export interface Stats {
@@ -43,7 +44,7 @@ export async function getStats(db: Database.Database, adapter?: ActualAdapter): 
   try {
     const [balances, txs, currency] = await Promise.all([
       adapter.getDailyBalances(1, { excludedAccounts: settings.excludedAccounts }),
-      adapter.getTransactions(addDaysIso(todayIsoUtc(), -(settings.lookbackDays - 1)), {
+      adapter.getTransactions(addDaysIso(todayInZone(), -(settings.lookbackDays - 1)), {
         excludedAccounts: settings.excludedAccounts,
       }),
       adapter.getCurrency(),
