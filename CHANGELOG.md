@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/rezanmz/actual-horizon/compare/actual-horizon-v1.2.1...actual-horizon-v1.2.2) (2026-09-14)
+
+
+### Bug Fixes
+
+* **sync:** pull from Actual server before recomputing snapshots in refresh job ([e36b880](https://github.com/rezanmz/actual-horizon/commit/e36b8800c769d9ebcee11ba88f132759074ad83b))
+
 ## [1.2.1](https://github.com/rezanmz/actual-horizon/compare/actual-horizon-v1.2.0...actual-horizon-v1.2.1) (2026-09-11)
 
 
