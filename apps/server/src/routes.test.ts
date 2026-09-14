@@ -6,10 +6,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ActualAdapter } from './actualAdapter.js';
 import { initDb } from './db.js';
 import { createApp } from './index.js';
+import { createSyncJob, type SyncJob, type SyncJobState } from './routes/sync.js';
 
 const DOWN: ActualAdapter = {
   getVersion: async () => '26.9.0',
   isReachable: async () => false,
+  sync: async () => {
+    throw new Error('down');
+  },
   getDailyBalances: async () => {
     throw new Error('down');
   },
@@ -30,6 +34,7 @@ const DOWN: ActualAdapter = {
 const LIVE: ActualAdapter = {
   ...DOWN,
   isReachable: async () => true,
+  sync: async () => {},
   getDailyBalances: async () => [{ date: '2026-09-05', spot: 9000 }],
   getTransactions: async () => [
     { date: '2026-09-05', amount: 200, isTransfer: false, accountId: 'a1', categoryId: null },
@@ -300,5 +305,77 @@ describe('background sync (#46)', () => {
     expect(second.startedAt).toBe(first.startedAt);
     const done = await waitForDone(base);
     expect(done.days).toBe(7);
+  });
+});
+
+describe('refresh pulls from Actual (#50)', () => {
+  async function settle(job: SyncJob): Promise<SyncJobState> {
+    for (let i = 0; i < 200; i += 1) {
+      const s = job.state();
+      if (s.status !== 'running') return s;
+      await sleep(10);
+    }
+    throw new Error('job never settled');
+  }
+
+  it('every run calls sync() before any adapter read', async () => {
+    const order: string[] = [];
+    const adapter: ActualAdapter = {
+      ...LIVE,
+      sync: async () => {
+        order.push('sync');
+      },
+      getDailyBalances: async (days: number) => {
+        order.push('read');
+        return LIVE.getDailyBalances(days);
+      },
+    };
+    const job = createSyncJob(memDb(), adapter);
+    job.start(7);
+    expect((await settle(job)).status).toBe('done');
+    // A second run post-boot is the incident scenario: it must pull again
+    // *before* its reads, not recompute from the boot-time cache.
+    job.start(7);
+    const done = await settle(job);
+    expect(done.status).toBe('done');
+    expect(typeof done.pulledAt).toBe('string');
+    expect(order[0]).toBe('sync');
+    const second = order.lastIndexOf('sync');
+    expect(second).toBeGreaterThan(1); // first run read after its pull
+    expect(order.slice(1, second).every((e) => e === 'read')).toBe(true);
+    expect(order.slice(second + 1).every((e) => e === 'read')).toBe(true);
+  });
+
+  it('a failed pull lands in the error state without any reads', async () => {
+    const adapter: ActualAdapter = {
+      ...LIVE,
+      sync: async () => {
+        throw new Error('server down');
+      },
+      getDailyBalances: async () => {
+        throw new Error('must not read after a failed pull');
+      },
+    };
+    const job = createSyncJob(memDb(), adapter);
+    job.start(7);
+    expect(await settle(job)).toMatchObject({ status: 'error', error: 'server down' });
+  });
+
+  it('GET /api/sync surfaces the pull failure instead of a deceptive done', async () => {
+    const adapter: ActualAdapter = {
+      ...LIVE,
+      sync: async () => {
+        throw new Error('boom');
+      },
+    };
+    const base = await serve(memDb(), adapter);
+    const post = await json(`${base}/api/sync?days=7`, { method: 'POST' });
+    expect(post.status).toBe(202);
+    let state: Record<string, unknown> = { status: 'running' };
+    for (let i = 0; i < 100 && state.status === 'running'; i += 1) {
+      state = (await json(`${base}/api/sync`)).body as Record<string, unknown>;
+      if (state.status === 'running') await sleep(20);
+    }
+    expect(state).toMatchObject({ status: 'error', error: 'boom' });
   });
 });
