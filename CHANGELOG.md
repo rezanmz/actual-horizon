@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.3](https://github.com/rezanmz/actual-horizon/compare/actual-horizon-v1.2.2...actual-horizon-v1.2.3) (2026-09-14)
+
+
+### Bug Fixes
+
+* **sync:** evaluate chart day boundaries in ACTUAL_TIMEZONE instead of UTC ([cae9ba1](https://github.com/rezanmz/actual-horizon/commit/cae9ba1a5f2380b94a2ac7b7315a6119b439dc1d))
+
 ## [1.2.2](https://github.com/rezanmz/actual-horizon/compare/actual-horizon-v1.2.1...actual-horizon-v1.2.2) (2026-09-14)
 
 
